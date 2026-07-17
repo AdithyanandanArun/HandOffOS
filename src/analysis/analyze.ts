@@ -1,6 +1,6 @@
-import type { WorkflowState, Finding } from '../domain/types.ts';
-import { demoNow, ESTIMATED_TASK_DURATION_DAYS } from '../domain/demo-clock.ts';
-import { evaluateAllRules, computeCriticalPath, findRootBlocker } from '../rules/engine.ts';
+import type { WorkflowState, Finding } from '../domain/types.js';
+import { demoNow, ESTIMATED_TASK_DURATION_DAYS } from '../domain/demo-clock.js';
+import { evaluateAllRules, computeCriticalPath, findRootBlocker } from '../rules/engine.js';
 
 export interface AnalysisResult {
   findings: Finding[];

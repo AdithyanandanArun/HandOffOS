@@ -1,3 +1,3 @@
-export * from './types.ts';
-export * from './demo-clock.ts';
-export * from './events.ts';
+export * from './types.js';
+export * from './demo-clock.js';
+export * from './events.js';

@@ -1,4 +1,4 @@
-import type { SourceEvent, Evidence } from './types.ts';
+import type { SourceEvent, Evidence } from './types.js';
 
 export const SEED_EVENTS: SourceEvent[] = [
   {

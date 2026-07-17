@@ -1,4 +1,4 @@
-import type { WorkflowState, WorkflowNode, SourceEvent, Evidence, AuditEntry } from '../domain/types.ts';
+import type { WorkflowState, WorkflowNode, SourceEvent, Evidence, AuditEntry } from '../domain/types.js';
 
 export interface WorkflowStateStore {
   getState(workflowId: string): WorkflowState | null;

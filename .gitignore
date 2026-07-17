@@ -4,6 +4,7 @@ src/widgets/node_modules/
 
 # Build outputs
 dist/
+.test-dist/
 src/widgets/.next/
 src/widgets/out/
 

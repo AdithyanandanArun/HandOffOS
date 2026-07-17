@@ -1,6 +1,6 @@
-import type { WorkflowState, WorkflowNode } from '../domain/types.ts';
-import { LAPTOP_SLA_DEADLINE, ONBOARDING_SLA_DEADLINE } from '../domain/demo-clock.ts';
-import { SEED_EVENTS, SEED_EVIDENCE } from '../domain/events.ts';
+import type { WorkflowState, WorkflowNode } from '../domain/types.js';
+import { LAPTOP_SLA_DEADLINE, ONBOARDING_SLA_DEADLINE } from '../domain/demo-clock.js';
+import { SEED_EVENTS, SEED_EVIDENCE } from '../domain/events.js';
 
 const SEED_NODES: WorkflowNode[] = [
   {

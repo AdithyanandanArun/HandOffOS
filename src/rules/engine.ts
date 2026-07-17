@@ -1,5 +1,5 @@
-import type { WorkflowState, WorkflowNode, Finding } from '../domain/types.ts';
-import { demoNow } from '../domain/demo-clock.ts';
+import type { WorkflowState, WorkflowNode, Finding } from '../domain/types.js';
+import { demoNow } from '../domain/demo-clock.js';
 
 export interface RuleDefinition {
   id: string;

@@ -1,3 +1,3 @@
-export { analyzeWorkflow, applyAnalysis, calculateHealth, estimateCompletion } from './analyze.ts';
-export type { AnalysisResult } from './analyze.ts';
-export { simulateResolution } from './simulate.ts';
+export { analyzeWorkflow, applyAnalysis, calculateHealth, estimateCompletion } from './analyze.js';
+export type { AnalysisResult } from './analyze.js';
+export { simulateResolution } from './simulate.js';
