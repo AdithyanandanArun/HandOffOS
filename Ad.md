@@ -19,6 +19,10 @@ You own:
 
 Do not implement G's domain store, Am's rule engine, or Y's widget UI. Import their public interfaces instead.
 
+## Temporary Cross-Team Coverage
+
+Ad is temporarily covering Am's remaining deterministic-analysis work on the `AD` branch. This includes keeping the exported risk-point policy, product documentation, and rule regression tests aligned with the required seeded health transition from 62 to 86. Do not duplicate this work on a separate branch without coordinating the merge.
+
 ## Implementation Tasks
 
 1. Replace the Phase 1 status module with the HandoffOS workflow module.

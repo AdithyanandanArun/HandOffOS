@@ -1,7 +1,23 @@
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
+
+// Next.js requires a project-relative distDir. Calculate one that resolves to
+// the system temp directory instead of leaving generated files in src/.
+const widgetDevCache = relative(
+  process.cwd(),
+  join(tmpdir(), 'handoffos-widget-runtime', 'build'),
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['nitrostack'],
+
+  // NitroStudio watches the full project tree, including node_modules. Keep
+  // Next's development artifacts outside the repository to avoid MCP reloads.
+  ...(process.env.NODE_ENV === 'development' && {
+    distDir: widgetDevCache,
+  }),
   
   // Static export for production builds
   ...(process.env.NODE_ENV === 'production' && {

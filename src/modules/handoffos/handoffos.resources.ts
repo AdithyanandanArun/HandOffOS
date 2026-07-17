@@ -1,4 +1,4 @@
-import { ExecutionContext, ResourceDecorator as Resource, Injectable } from '@nitrostack/core';
+import { ExecutionContext, Injectable, ResourceDecorator as Resource } from '@nitrostack/core';
 import { HandoffOSApplication } from '../../application/handoffos.application.js';
 
 const workflowId = 'onboard-priya';
@@ -15,7 +15,7 @@ function jsonResource(uri: string, value: unknown) {
 
 @Injectable({ deps: [HandoffOSApplication] })
 export class HandoffOSResources {
-  constructor(private readonly app: HandoffOSApplication) {}
+  constructor(private readonly application: HandoffOSApplication) {}
 
   @Resource({
     uri: 'workflow://onboard-priya/state',
@@ -25,7 +25,7 @@ export class HandoffOSResources {
   })
   async getState(uri: string, context: ExecutionContext) {
     context.logger.info('Reading workflow state', { workflowId });
-    return jsonResource(uri, await this.app.getState(workflowId));
+    return jsonResource(uri, await this.application.getState(workflowId));
   }
 
   @Resource({
@@ -36,7 +36,7 @@ export class HandoffOSResources {
   })
   async getEvents(uri: string, context: ExecutionContext) {
     context.logger.info('Reading workflow events', { workflowId });
-    return jsonResource(uri, await this.app.getEvents(workflowId));
+    return jsonResource(uri, await this.application.getEvents(workflowId));
   }
 
   @Resource({
@@ -47,7 +47,7 @@ export class HandoffOSResources {
   })
   async getFindings(uri: string, context: ExecutionContext) {
     context.logger.info('Reading workflow findings', { workflowId });
-    return jsonResource(uri, await this.app.getFindings(workflowId));
+    return jsonResource(uri, await this.application.getFindings(workflowId));
   }
 
   @Resource({
@@ -58,7 +58,7 @@ export class HandoffOSResources {
   })
   async getAuditLog(uri: string, context: ExecutionContext) {
     context.logger.info('Reading workflow audit log', { workflowId });
-    return jsonResource(uri, await this.app.getAuditLog(workflowId));
+    return jsonResource(uri, await this.application.getAuditLog(workflowId));
   }
 
   @Resource({
@@ -69,7 +69,6 @@ export class HandoffOSResources {
   })
   async getRules(uri: string, context: ExecutionContext) {
     context.logger.info('Reading deterministic workflow rules');
-    return jsonResource(uri, await this.app.getRules());
+    return jsonResource(uri, await this.application.getRules());
   }
 }
-

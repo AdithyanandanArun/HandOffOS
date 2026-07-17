@@ -36,12 +36,17 @@ Do not edit `src/domain/**`, `src/workflow/**`, `src/modules/handoffos/**`, or `
    max(0, 100 - total risk points)
    ```
 
-5. Use the agreed risk values:
+5. Use the calibrated, non-overlapping health risk policy exported as `RISK_POINTS`:
 
-   - Blocked node: 30
-   - SLA overdue: 20
-   - Critical-path block: 25
-   - Each blocked downstream node: 10
+   - Missing owner: 5
+   - Missing external dependency: 10
+   - SLA overdue: 9 per affected node
+   - Missing document: 5
+   - Critical-path block: 5
+   - Stale approval: 0 (informational evidence)
+   - Missing calendar event: 5
+
+   The seeded state must total 38 risk points (health 62); resolving Laptop Allocation must remove 24 points (health 86). Do not double-count downstream impact already represented by the dependency and critical-path findings.
 
 6. Implement `simulateResolution(state, nodeId, resolvedAt)` using a deep clone. Return before/after health, completion estimate, critical path, and findings delta without mutating live state.
 7. Make simulation of Laptop Allocation produce the planned demo change from health 62 to health 86.
