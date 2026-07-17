@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "widgets": [
+    {
+      "uri": "/handoffos-status",
+      "name": "HandoffOS Foundation Status",
+      "description": "Shows that the HandoffOS NitroStack foundation is available.",
+      "examples": [
+        {
+          "name": "Foundation ready",
+          "description": "Phase 1 HandoffOS server status.",
+          "data": {
+            "name": "HandoffOS",
+            "phase": 1,
+            "status": "foundation_ready"
+          }
+        }
+      ],
+      "tags": ["handoffos", "workflow", "mcp"]
+    }
+  ]
+}
