@@ -9,6 +9,7 @@ This is the append-only team tracker. Every repository change must add a dated e
 - 2026-07-17 | Ad | Product README, architecture plan, and phased implementation plan added. | `git diff --check` passed.
 - 2026-07-17 | Ad | Commit `382843b` pushed to `origin/main` without a coauthor trailer. | Local branch matches `origin/main`.
 - 2026-07-17 | Ad | Graphify initialized with `graphify update .`; generated graph output is now ignored by Git. | 116 nodes, 109 edges, 14 communities; `graphify-out/` added to `.gitignore`.
+- 2026-07-17 | Ad | MCP integration skeleton completed: application ports, workflow resources, five tools, two evidence-only prompts, Zod schemas, planned-action execution gate, and mock-port tests. | Files: `src/application/**`, `src/modules/handoffos/**`, `tests/mcp/**` | Verification: `npm test` passed with 4 tests; NitroStack production build passed | Commit: `ced5aca`.
 
 ## In Progress
 
