@@ -56,7 +56,7 @@ export class HandoffOSApplication {
     private readonly analysis: AnalysisPort = unavailableAnalysisPort,
     private readonly actions: ActionPort = unavailableActionPort,
     private readonly audit: AuditPort = unavailableAuditPort,
-  ) {}
+  ) { }
 
   getState(workflowId: WorkflowId): Promise<WorkflowStateSnapshot> {
     return this.workflow.getState(workflowId);
