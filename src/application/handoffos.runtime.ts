@@ -11,7 +11,7 @@ import type {
   WorkflowState,
 } from '../domain/types.js';
 import { ALL_RULES } from '../rules/engine.js';
-import { createSeedState } from '../workflow/seed.js';
+import { createSeedState, createVendorSeedState } from '../workflow/seed.js';
 import { InMemoryWorkflowStateStore, type WorkflowStateStore } from '../workflow/state-store.js';
 import type {
   ActionExecutionResult,
@@ -205,6 +205,10 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     const seed = applyAnalysis(createSeedState());
     this.store.setState(seed);
     this.updatedAtByWorkflow.set(seed.workflowId, demoNow());
+
+    const seedVendor = applyAnalysis(createVendorSeedState());
+    this.store.setState(seedVendor);
+    this.updatedAtByWorkflow.set(seedVendor.workflowId, demoNow());
   }
 
   async getState(workflowId: WorkflowId): Promise<WorkflowStateSnapshot> {

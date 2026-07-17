@@ -1,5 +1,5 @@
-export { WorkflowStateStore, InMemoryWorkflowStateStore } from './state-store.js';
-export { createSeedState } from './seed.js';
+export { WorkflowStateStore, InMemoryWorkflowStateStore, AlertSubscriptionStore, InMemoryAlertSubscriptionStore } from './state-store.js';
+export { createSeedState, createVendorSeedState } from './seed.js';
 export {
   areDependenciesComplete,
   getIncompleteDependencies,
@@ -8,4 +8,6 @@ export {
   findRootBlocker,
   deriveNodeStatus,
   propagateStatuses,
+  getOwnerWorkload,
 } from './graph.js';
+
