@@ -17,6 +17,13 @@ import {
   type WorkflowIdInput,
 } from './handoffos.schemas.js';
 
+const defaultWorkflowId = 'onboard-priya';
+
+// NitroStudio task cards can omit fields with JSON Schema defaults.
+function resolveWorkflowId(input: Partial<WorkflowIdInput> | undefined): string {
+  return input?.workflowId || defaultWorkflowId;
+}
+
 @Injectable({ deps: [HandoffOSApplication] })
 export class HandoffOSTools {
   constructor(private readonly application: HandoffOSApplication) {}
@@ -28,8 +35,9 @@ export class HandoffOSTools {
     outputSchema: ingestEventOutputSchema,
   })
   async ingestEvent(input: IngestEventInput, context: ExecutionContext) {
-    context.logger.info('Ingesting workflow event', { workflowId: input.workflowId, eventId: input.event.id });
-    const state = await this.application.ingestEvent(input.workflowId, input.event);
+    const workflowId = resolveWorkflowId(input);
+    context.logger.info('Ingesting workflow event', { workflowId, eventId: input.event.id });
+    const state = await this.application.ingestEvent(workflowId, input.event);
     return {
       summary: `Ingested ${input.event.type} from ${input.event.source}; workflow state was recalculated.`,
       state,
@@ -44,11 +52,12 @@ export class HandoffOSTools {
     outputSchema: detectBlockersOutputSchema,
   })
   async detectBlockers(input: WorkflowIdInput, context: ExecutionContext) {
-    context.logger.info('Detecting workflow blockers', { workflowId: input.workflowId });
+    const workflowId = resolveWorkflowId(input);
+    context.logger.info('Detecting workflow blockers', { workflowId });
     const [analysis, state, auditLog] = await Promise.all([
-      this.application.detectBlockers(input.workflowId),
-      this.application.getState(input.workflowId),
-      this.application.getAuditLog(input.workflowId),
+      this.application.detectBlockers(workflowId),
+      this.application.getState(workflowId),
+      this.application.getAuditLog(workflowId),
     ]);
     return {
       summary: analysis.mainBlocker
@@ -67,11 +76,12 @@ export class HandoffOSTools {
     outputSchema: simulateResolutionOutputSchema,
   })
   async simulateResolution(input: SimulateResolutionInput, context: ExecutionContext) {
-    context.logger.info('Simulating workflow resolution', { workflowId: input.workflowId, nodeId: input.nodeId });
+    const workflowId = resolveWorkflowId(input);
+    context.logger.info('Simulating workflow resolution', { workflowId, nodeId: input.nodeId });
     const [simulation, state, auditLog] = await Promise.all([
-      this.application.simulateResolution(input.workflowId, input.nodeId, input.resolvedAt),
-      this.application.getState(input.workflowId),
-      this.application.getAuditLog(input.workflowId),
+      this.application.simulateResolution(workflowId, input.nodeId, input.resolvedAt),
+      this.application.getState(workflowId),
+      this.application.getAuditLog(workflowId),
     ]);
     return {
       summary: `Simulation projects health changing from ${simulation.before.healthScore} to ${simulation.after.healthScore}; live state is unchanged.`,
@@ -93,8 +103,9 @@ export class HandoffOSTools {
     outputSchema: planNextActionsOutputSchema,
   })
   async planNextActions(input: WorkflowIdInput, context: ExecutionContext) {
-    context.logger.info('Planning next workflow actions', { workflowId: input.workflowId });
-    const actions = await this.application.planNextActions(input.workflowId);
+    const workflowId = resolveWorkflowId(input);
+    context.logger.info('Planning next workflow actions', { workflowId });
+    const actions = await this.application.planNextActions(workflowId);
     return {
       summary: actions.length
         ? `${actions.length} evidence-backed action${actions.length === 1 ? '' : 's'} require approval before execution.`
@@ -111,11 +122,12 @@ export class HandoffOSTools {
     outputSchema: executeActionOutputSchema,
   })
   async executeAction(input: ExecuteActionInput, context: ExecutionContext) {
-    context.logger.info('Executing approved workflow action', { workflowId: input.workflowId, actionId: input.actionId });
-    const execution = await this.application.executeAction(input.workflowId, input.actionId, input.approvedBy);
+    const workflowId = resolveWorkflowId(input);
+    context.logger.info('Executing approved workflow action', { workflowId, actionId: input.actionId });
+    const execution = await this.application.executeAction(workflowId, input.actionId, input.approvedBy);
     const [analysis, auditLog] = await Promise.all([
-      this.application.detectBlockers(input.workflowId),
-      this.application.getAuditLog(input.workflowId),
+      this.application.detectBlockers(workflowId),
+      this.application.getAuditLog(workflowId),
     ]);
     return {
       summary: execution.summary,

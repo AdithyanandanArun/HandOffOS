@@ -122,6 +122,9 @@ test('dashboard-linked tools emit validated structured responses for the widget'
   const application = createApplication();
   const tools = new HandoffOSTools(application);
 
+  const defaultBlockers = await tools.detectBlockers({}, context);
+  assert.equal(defaultBlockers.analysis.workflowId, workflowId);
+
   const blockers = await tools.detectBlockers({ workflowId }, context);
   assert.equal(detectBlockersOutputSchema.safeParse(blockers).success, true);
   assert.equal(blockers.workflow.stations.find((station) => station.id === 'laptop-allocation')?.status, 'blocked');
