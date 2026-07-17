@@ -70,6 +70,8 @@ manager_summary
 
 Phase 1 establishes the NitroStack application foundation. The full product plan is in [Plan.md](Plan.md), and the phased implementation checklist is in [implementation.md](implementation.md).
 
+Team ownership and the shared progress tracker are documented in [Ad.md](Ad.md), [Y.md](Y.md), [Am.md](Am.md), [G.md](G.md), and [Done.md](Done.md).
+
 ## Local Development
 
 Once Phase 1 dependencies are installed:
