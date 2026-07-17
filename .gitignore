@@ -48,6 +48,8 @@ uploads/
 # Optional npm cache
 .npm/
 
+# Graphify generated graph and reports
+graphify-out/
+
 # Optional eslint cache
 .eslintcache
-
