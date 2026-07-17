@@ -7,6 +7,7 @@
  */
 
 import type { WorkflowState, WorkflowNode, NodeStatus } from '../domain/types.js';
+import type { WorkflowStateStore } from './state-store.js';
 
 // ---------------------------------------------------------------------------
 // Internal utilities
@@ -218,3 +219,39 @@ export function propagateStatuses(state: WorkflowState): WorkflowState {
 
   return { ...state, nodes: updatedNodes };
 }
+
+export function getOwnerWorkload(
+  store: WorkflowStateStore,
+  ownerId: string
+): { openNodesCount: number; findingsCount: number } {
+  let openNodesCount = 0;
+  const findingIds = new Set<string>();
+
+  const workflowIds = store.listWorkflowIds();
+  for (const wId of workflowIds) {
+    const state = store.getState(wId);
+    if (!state) continue;
+
+    for (const node of state.nodes) {
+      if (node.owner === ownerId && node.status !== 'completed') {
+        openNodesCount++;
+      }
+    }
+
+    for (const finding of state.findings) {
+      const affectsOwnerNode = finding.affectedNodeIds.some(nodeId => {
+        const node = state.nodes.find(n => n.id === nodeId);
+        return node !== undefined && node.owner === ownerId;
+      });
+      if (affectsOwnerNode) {
+        findingIds.add(`${wId}-${finding.id}`);
+      }
+    }
+  }
+
+  return {
+    openNodesCount,
+    findingsCount: findingIds.size,
+  };
+}
+

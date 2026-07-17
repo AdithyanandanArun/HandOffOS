@@ -83,3 +83,13 @@ export interface WorkflowState {
   estimatedCompletion: Date | null;
   auditLog: AuditEntry[];
 }
+
+export interface AlertSubscription {
+  id: string;
+  workflowId: string;
+  metric: string;
+  threshold: number;
+  comparator: string;
+  subscriberId: string;
+}
+

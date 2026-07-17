@@ -81,3 +81,141 @@ export function createSeedState(): WorkflowState {
     auditLog: [],
   };
 }
+
+const VENDOR_SEED_NODES: WorkflowNode[] = [
+  {
+    id: 'contract-signature',
+    label: 'Contract Signature',
+    owner: 'Legal Team',
+    status: 'completed',
+    dependencies: [],
+    completedAt: new Date('2025-01-10T10:00:00Z'),
+    evidenceIds: ['EVD-V01'],
+  },
+  {
+    id: 'tax-verification',
+    label: 'Tax Verification',
+    owner: 'Finance Team',
+    status: 'completed',
+    dependencies: ['contract-signature'],
+    completedAt: new Date('2025-01-11T14:30:00Z'),
+    evidenceIds: ['EVD-V02'],
+  },
+  {
+    id: 'security-review',
+    label: 'Security Review',
+    owner: 'Security Ops',
+    status: 'blocked',
+    dependencies: ['contract-signature'],
+    sla: new Date('2025-01-12T17:00:00Z'),
+    evidenceIds: ['EVD-V03', 'EVD-V04'],
+  },
+  {
+    id: 'account-setup',
+    label: 'Account Setup',
+    owner: 'IT Ops',
+    status: 'blocked',
+    dependencies: ['security-review'],
+    evidenceIds: [],
+  },
+  {
+    id: 'system-access',
+    label: 'System Access',
+    owner: 'IT Security',
+    status: 'pending',
+    dependencies: ['account-setup'],
+    evidenceIds: [],
+  },
+  {
+    id: 'finance-audit',
+    label: 'Finance Audit',
+    owner: 'Finance Team',
+    status: 'blocked',
+    dependencies: ['security-review'],
+    evidenceIds: [],
+  },
+  {
+    id: 'payment-activation',
+    label: 'Payment Activation',
+    owner: 'Finance Team',
+    status: 'pending',
+    dependencies: ['finance-audit'],
+    sla: new Date('2025-01-16T17:00:00Z'),
+    evidenceIds: [],
+  },
+];
+
+export function createVendorSeedState(): WorkflowState {
+  return {
+    workflowId: 'vendor-onboarding',
+    label: 'Vendor Onboarding',
+    subject: 'Global Corp',
+    nodes: VENDOR_SEED_NODES.map(n => ({ ...n, dependencies: [...n.dependencies], evidenceIds: [...n.evidenceIds] })),
+    events: [
+      {
+        id: 'EVT-V01',
+        source: 'gmail',
+        timestamp: new Date('2025-01-10T10:00:00Z'),
+        actor: 'Legal Lead',
+        type: 'contract_signed',
+        payload: { agreement: 'MSA', status: 'signed' },
+        evidenceId: 'EVD-V01',
+      },
+      {
+        id: 'EVT-V02',
+        source: 'hr-system',
+        timestamp: new Date('2025-01-11T14:30:00Z'),
+        actor: 'Finance System',
+        type: 'tax_verified',
+        payload: { taxId: 'TX-9988', status: 'verified' },
+        evidenceId: 'EVD-V02',
+      },
+      {
+        id: 'EVT-V03',
+        source: 'task-board',
+        timestamp: new Date('2025-01-12T09:00:00Z'),
+        actor: 'Security Team',
+        type: 'review_triggered',
+        payload: { reviewType: 'vendor_security', sla: '2025-01-12T17:00:00Z' },
+        evidenceId: 'EVD-V03',
+      },
+    ],
+    evidence: [
+      {
+        id: 'EVD-V01',
+        sourceEventId: 'EVT-V01',
+        type: 'event',
+        description: 'Legal confirmed MSA contract is signed by all parties.',
+        timestamp: new Date('2025-01-10T10:00:00Z'),
+      },
+      {
+        id: 'EVD-V02',
+        sourceEventId: 'EVT-V02',
+        type: 'event',
+        description: 'Finance verified tax status for Global Corp.',
+        timestamp: new Date('2025-01-11T14:30:00Z'),
+      },
+      {
+        id: 'EVD-V03',
+        sourceEventId: 'EVT-V03',
+        type: 'event',
+        description: 'Security review triggered with SLA deadline 2025-01-12.',
+        timestamp: new Date('2025-01-12T09:00:00Z'),
+      },
+      {
+        id: 'EVD-V04',
+        sourceEventId: null,
+        type: 'absence',
+        description: 'No response received for security questionnaire. Review is overdue.',
+        timestamp: new Date('2025-01-15T10:00:00Z'),
+      },
+    ],
+    findings: [],
+    rootBlocker: null,
+    criticalPath: [],
+    health: 100,
+    estimatedCompletion: null,
+    auditLog: [],
+  };
+}
+
