@@ -4,6 +4,7 @@ src/widgets/node_modules/
 
 # Build outputs
 dist/
+.test-dist/
 src/widgets/.next/
 src/widgets/out/
 
@@ -48,6 +49,9 @@ uploads/
 # Optional npm cache
 .npm/
 
+# Graphify generated graph and reports
+graphify-out/
+
 # Optional eslint cache
 .eslintcache
-
+.nitrostudio/

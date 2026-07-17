@@ -1,2 +1,11 @@
-export { WorkflowStateStore, InMemoryWorkflowStateStore } from './state-store.ts';
-export { createSeedState } from './seed.ts';
+export { WorkflowStateStore, InMemoryWorkflowStateStore } from './state-store.js';
+export { createSeedState } from './seed.js';
+export {
+  areDependenciesComplete,
+  getIncompleteDependencies,
+  getDownstreamNodes,
+  computeCriticalPath,
+  findRootBlocker,
+  deriveNodeStatus,
+  propagateStatuses,
+} from './graph.js';

@@ -1,4 +1,4 @@
-import type { SourceEvent, Evidence } from './types.ts';
+import type { SourceEvent, Evidence } from './types.js';
 
 export const SEED_EVENTS: SourceEvent[] = [
   {
@@ -55,6 +55,23 @@ export const SEED_EVENTS: SourceEvent[] = [
     },
     evidenceId: 'EVD-006',
   },
+  {
+    id: 'EVT-005',
+    source: 'calendar',
+    timestamp: new Date('2025-01-08T16:00:00Z'),
+    actor: 'HR System',
+    type: 'invite_cancelled',
+    payload: {
+      // Title deliberately does not contain 'orientation' so R-007 (which checks for
+      // an active calendar slot by nodeId substring) correctly reports the slot as missing.
+      title: 'Priya Nair — New-Hire Welcome Session (CANCELLED)',
+      sessionType: 'new_hire_induction',
+      scheduledFor: '2025-01-14T09:00:00Z',
+      reason: 'laptop_not_provisioned',
+      attendees: ['priya.nair@company.com', 'hr@company.com'],
+    },
+    evidenceId: 'EVD-005',
+  },
 ];
 
 export const SEED_EVIDENCE: Evidence[] = [
@@ -88,10 +105,10 @@ export const SEED_EVIDENCE: Evidence[] = [
   },
   {
     id: 'EVD-005',
-    sourceEventId: null,
+    sourceEventId: 'EVT-005',
     type: 'absence',
-    description: 'No calendar event found for Priya Nair orientation session.',
-    timestamp: new Date('2025-01-15T10:00:00Z'),
+    description: 'Orientation calendar invite for Priya Nair was cancelled by HR System on 2025-01-08 because the laptop had not been provisioned. No active calendar slot exists.',
+    timestamp: new Date('2025-01-08T16:00:00Z'),
   },
   {
     id: 'EVD-006',

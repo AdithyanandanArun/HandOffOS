@@ -2,21 +2,41 @@
   "version": "1.0.0",
   "widgets": [
     {
-      "uri": "/handoffos-status",
-      "name": "HandoffOS Foundation Status",
-      "description": "Shows that the HandoffOS NitroStack foundation is available.",
+      "uri": "/handoff-dashboard",
+      "name": "HandoffOS Transit Dashboard",
+      "description": "Transit-map workflow dashboard for blocker detection, simulation, and approved execution.",
       "examples": [
         {
-          "name": "Foundation ready",
-          "description": "Phase 1 HandoffOS server status.",
+          "name": "Priya blocker detection",
+          "description": "Root blocker, evidence, and downstream impact for the onboarding workflow.",
           "data": {
-            "name": "HandoffOS",
-            "phase": 1,
-            "status": "foundation_ready"
+            "workflowId": "onboard-priya",
+            "subject": "Priya Nair onboarding",
+            "liveTool": "detect_blockers",
+            "health": 62,
+            "estimatedCompletion": "2026-07-22 17:00 IST"
           }
         }
       ],
-      "tags": ["handoffos", "workflow", "mcp"]
+      "tags": ["handoffos", "workflow", "transit-map", "blockers"]
+    },
+    {
+      "uri": "/handoffos-status",
+      "name": "HandoffOS Transit Dashboard Legacy Route",
+      "description": "Compatibility route for the dashboard while server-side widget wiring still points to the original URI.",
+      "examples": [
+        {
+          "name": "Compatibility route",
+          "description": "Legacy widget URI rendering the same transit dashboard.",
+          "data": {
+            "workflowId": "onboard-priya",
+            "subject": "Priya Nair onboarding",
+            "liveTool": "detect_blockers",
+            "health": 62
+          }
+        }
+      ],
+      "tags": ["handoffos", "workflow", "compatibility"]
     }
   ]
 }
