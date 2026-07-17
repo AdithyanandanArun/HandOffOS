@@ -3,7 +3,6 @@
 ## Setup
 
 ```bash
-npm test
 npm run dev
 ```
 
