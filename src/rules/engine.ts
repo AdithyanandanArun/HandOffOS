@@ -8,6 +8,19 @@ export interface RuleDefinition {
   evaluate: (state: WorkflowState) => Finding[];
 }
 
+// Health risk is intentionally de-duplicated across overlapping rules. The seed
+// produces 38 points (health 62); resolving Laptop Allocation removes 24 points
+// and leaves the Orientation SLA/calendar risk at 14 points (health 86).
+export const RISK_POINTS = {
+  missingOwner: 5,
+  missingDependency: 10,
+  slaOverdue: 9,
+  missingDocument: 5,
+  criticalPathBlocked: 5,
+  approvalStale: 0,
+  calendarMissing: 5,
+} as const;
+
 function findingId(ruleId: string, nodeId: string): string {
   return `${ruleId}::${nodeId}`;
 }
@@ -34,7 +47,7 @@ const R001: RuleDefinition = {
           explanation: `Node "${node.label}" has no assigned owner. Work cannot proceed without accountability.`,
           evidenceIds: [...node.evidenceIds],
           affectedNodeIds: [node.id],
-          riskPoints: 5,
+          riskPoints: RISK_POINTS.missingOwner,
         });
       }
     }
@@ -73,7 +86,7 @@ const R002: RuleDefinition = {
           explanation: `Node "${node.label}" is blocked despite all workflow dependencies being completed. An external dependency (${absenceEvidence.length > 0 ? absenceEvidence[0].description : 'unknown'}) was not fulfilled.`,
           evidenceIds,
           affectedNodeIds: [node.id, ...getDownstreamNodes(state, node.id)],
-          riskPoints: 10,
+          riskPoints: RISK_POINTS.missingDependency,
         });
       }
     }
@@ -102,7 +115,7 @@ const R003: RuleDefinition = {
           explanation: `Node "${node.label}" SLA expired ${hrsOverdue} hours ago (deadline: ${node.sla.toISOString()}).`,
           evidenceIds: [...node.evidenceIds],
           affectedNodeIds: [node.id],
-          riskPoints: 9,
+          riskPoints: RISK_POINTS.slaOverdue,
         });
       }
     }
@@ -137,7 +150,7 @@ const R004: RuleDefinition = {
           explanation: `Node "${node.label}" is missing required documentation: ${docAbsence.description}`,
           evidenceIds: [docAbsence.id],
           affectedNodeIds: [node.id],
-          riskPoints: 5,
+          riskPoints: RISK_POINTS.missingDocument,
         });
       }
     }
@@ -165,7 +178,7 @@ const R005: RuleDefinition = {
           explanation: `Node "${node.label}" is on the critical path and is blocked. All downstream work is stalled.`,
           evidenceIds: [...node.evidenceIds],
           affectedNodeIds: [node.id, ...getDownstreamNodes(state, node.id)],
-          riskPoints: 5,
+          riskPoints: RISK_POINTS.criticalPathBlocked,
         });
         break;
       }
@@ -201,7 +214,7 @@ const R006: RuleDefinition = {
             explanation: `Approval from "${evt.actor}" on ${evt.timestamp.toISOString().split('T')[0]} has not resulted in downstream progress after ${Math.floor(age / (24 * 60 * 60 * 1000))} days.`,
             evidenceIds: evidence ? [evidence.id] : [],
             affectedNodeIds: state.nodes.filter(n => n.status === 'blocked').map(n => n.id),
-            riskPoints: 0,
+          riskPoints: RISK_POINTS.approvalStale,
           });
         }
       }
@@ -239,7 +252,7 @@ const R007: RuleDefinition = {
           explanation: `Node "${node.label}" requires a calendar event but none has been scheduled.`,
           evidenceIds: absence ? [absence.id] : [],
           affectedNodeIds: [node.id],
-          riskPoints: 5,
+          riskPoints: RISK_POINTS.calendarMissing,
         });
       }
     }

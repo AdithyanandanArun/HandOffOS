@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createSeedState } from '../../src/workflow/seed.js';
-import { evaluateAllRules, computeCriticalPath, findRootBlocker, getDownstreamNodes, ALL_RULES } from '../../src/rules/engine.js';
+import { evaluateAllRules, computeCriticalPath, findRootBlocker, getDownstreamNodes, ALL_RULES, RISK_POINTS } from '../../src/rules/engine.js';
 import { analyzeWorkflow, calculateHealth } from '../../src/analysis/analyze.js';
 import { simulateResolution } from '../../src/analysis/simulate.js';
 import { demoNow } from '../../src/domain/demo-clock.js';
@@ -179,10 +179,26 @@ describe('Downstream Nodes', () => {
 });
 
 describe('Health Calculation', () => {
+  it('uses the documented calibrated risk policy without double-counting symptoms', () => {
+    assert.deepEqual(RISK_POINTS, {
+      missingOwner: 5,
+      missingDependency: 10,
+      slaOverdue: 9,
+      missingDocument: 5,
+      criticalPathBlocked: 5,
+      approvalStale: 0,
+      calendarMissing: 5,
+    });
+  });
+
   it('initial health is 62', () => {
     const state = seedState();
     const result = analyzeWorkflow(state);
     assert.equal(result.health, 62);
+    assert.equal(
+      result.healthBreakdown.reduce((total, item) => total + item.riskPoints, 0),
+      38,
+    );
   });
 
   it('health formula is max(0, 100 - total risk)', () => {
@@ -247,6 +263,7 @@ describe('simulateResolution', () => {
     const result = simulateResolution(state, 'laptop-allocation', demoNow());
     assert.equal(result.beforeHealth, 62);
     assert.equal(result.afterHealth, 86);
+    assert.equal(result.afterHealth - result.beforeHealth, 24);
   });
 
   it('leaves the original state unchanged', () => {

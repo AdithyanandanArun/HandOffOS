@@ -68,7 +68,9 @@ manager_summary
 
 ## Status
 
-Phase 1 establishes the NitroStack application foundation. The full product plan is in [Plan.md](Plan.md), and the phased implementation checklist is in [implementation.md](implementation.md).
+Phases 1 through 4 are implemented for the seeded Priya onboarding demo: the NitroStack MCP surface is wired to deterministic workflow state, rules, simulation, approved execution, audit history, and the transit-map output contract. The full product plan is in [Plan.md](Plan.md), and the phased implementation checklist is in [implementation.md](implementation.md).
+
+The repeatable judge flow is in [DEMO.md](DEMO.md).
 
 Team ownership and the shared progress tracker are documented in [Ad.md](Ad.md), [Y.md](Y.md), [Am.md](Am.md), [G.md](G.md), and [Done.md](Done.md).
 
