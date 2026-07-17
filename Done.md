@@ -9,6 +9,12 @@ This is the append-only team tracker. Each teammate must add a dated entry after
 - 2026-07-17 | Ad | Product README, architecture plan, and phased implementation plan added. | `git diff --check` passed.
 - 2026-07-17 | Ad | Commit `382843b` pushed to `origin/main` without a coauthor trailer. | Local branch matches `origin/main`.
 
+- 2026-07-17 | Am | Phase 2 (prerequisite): Domain types, demo clock, seed events, workflow state store, and Priya onboarding seed data. | Files: `src/domain/types.ts`, `src/domain/demo-clock.ts`, `src/domain/events.ts`, `src/domain/index.ts`, `src/workflow/state-store.ts`, `src/workflow/seed.ts`, `src/workflow/index.ts` | Verification: types compile, seed produces 7 nodes with correct statuses.
+- 2026-07-17 | Am | Phase 3: Rules engine R-001 through R-007 implemented. R-002 detects missing external dependency on laptop-allocation. R-005 detects critical path blocked. All rules deterministic with evidence tracing. | Files: `src/rules/engine.ts`, `src/rules/index.ts` | Verification: `node --experimental-strip-types --test tests/rules/rules.test.ts` — 35 tests pass.
+- 2026-07-17 | Am | Phase 3: analyzeWorkflow returns findings, root blocker (laptop-allocation), critical path, health (62), and completion estimate. Health formula: max(0, 100 - total risk points). | Files: `src/analysis/analyze.ts`, `src/analysis/index.ts` | Verification: initial health verified at 62.
+- 2026-07-17 | Am | Phase 3: simulateResolution deep-clones state, resolves node, propagates statuses, returns before/after health with findings delta. Laptop allocation simulation: health 62 → 86. Original state unchanged. | Files: `src/analysis/simulate.ts` | Verification: simulation test passes, state immutability verified.
+- 2026-07-17 | Am | Phase 6 (partial): 35 tests covering all 7 rules, health scoring, critical path, root blocker, downstream nodes, simulation isolation, finding stability, and evidence traceability. | Files: `tests/rules/rules.test.ts` | Verification: `node --experimental-strip-types --test tests/rules/rules.test.ts` — 35/35 pass.
+
 ## In Progress
 
 - Phase 2: Workflow domain contracts and deterministic Priya onboarding seed.
