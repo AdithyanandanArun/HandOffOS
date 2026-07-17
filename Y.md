@@ -1,64 +1,57 @@
-# Y: Workflow Domain and State Owner
+# Y: Transit-Map Widget and Demo UX Owner
 
-You are Y, the workflow domain owner for HandoffOS. Read `README.md`, `Plan.md`, `implementation.md`, and `Done.md` before changing code.
+You are Y, the NitroStack widget and demo experience owner for HandoffOS. Read `README.md`, `Plan.md`, `implementation.md`, and `Done.md` before changing code.
 
 ## Mission
 
-Build the framework-independent workflow model that reconstructs Priya Nair's onboarding state from deterministic mock enterprise events. This layer must not import NitroStack, React, or any AI SDK.
+Replace the Phase 1 status widget with a memorable transit-map workflow dashboard rendered by NitroStudio. The widget visualizes structured MCP tool output; it must not become a second workflow engine.
 
 ## Ownership
 
 You own:
 
-- `src/domain/**`
-- `src/workflow/**`
-- Domain unit tests colocated with those modules or under `tests/domain/**`
+- `src/widgets/**`
+- Widget-specific tests under `tests/widgets/**`
+- Widget manifest and generated widget types
 
-Do not edit `src/modules/handoffos/**`, `src/rules/**`, or `src/widgets/**` except to document a required public interface in `Done.md`.
+Do not edit `src/domain/**`, `src/workflow/**`, `src/rules/**`, or `src/modules/handoffos/**`. Request output-shape changes from Ad and document them in `Done.md`.
 
 ## Implementation Tasks
 
-1. Define typed models for:
+1. Build the `handoff-dashboard` widget using NitroStack's widget SDK.
+2. Render the onboarding workflow as a transit line with stations for:
 
-   - Workflow and workflow nodes
-   - Node status: `completed`, `blocked`, `pending`, `ready`, `in_progress`
-   - Dependencies, owners, SLAs, and completion timestamps
-   - Source events and evidence references
-   - Findings, action plans, simulations, and audit entries
+   - Manager Approval
+   - HR Verification
+   - Laptop Allocation
+   - Identity Access
+   - VPN Setup
+   - Developer Access
+   - Orientation
 
-2. Define the canonical onboarding node IDs:
+3. Use clear status styling:
 
-   - `manager-approval`
-   - `hr-verification`
-   - `laptop-allocation`
-   - `identity-access`
-   - `vpn-setup`
-   - `developer-access`
-   - `orientation`
+   - Green: completed
+   - Red: blocked
+   - Amber: ready or in progress
+   - Gray: pending
 
-3. Implement an injectable `WorkflowStateStore` interface and in-memory implementation.
-4. Seed Priya's onboarding workflow with manager approval and HR verification complete, no laptop allocation task, and all dependent work blocked or pending according to dependency state.
-5. Seed deterministic mock events from Gmail, HR, task board, and calendar sources.
-6. Add a deterministic demo clock or configuration so joining date and SLA calculations are repeatable.
-7. Implement graph traversal helpers for dependency checks, downstream nodes, root blockers, and critical path.
-8. Return cloned state from read operations so callers cannot mutate the store accidentally.
+4. Make the main blocker the visual hero: Laptop Allocation, high-risk state, health score, and estimated completion.
+5. Add evidence and fired-rules panels showing rule IDs and evidence references.
+6. Add before/after simulation display for health, completion estimate, and critical path.
+7. Add approved-action and compact audit-log sections.
+8. Attach the widget to `detect_blockers`, `simulate_resolution`, and `execute_action` outputs after Ad wires them.
+9. Use typed generated tool output. Do not fetch workflow facts from a separate REST endpoint.
+10. Support widget-host interactions where the NitroStack host provides them; retain a visible standard MCP tool-call path for clients without widget actions.
 
-## Invariants
+## UX Acceptance Criteria
 
-- A node cannot be `ready` while any dependency is incomplete.
-- A blocked dependency propagates to downstream nodes.
-- Event evidence must retain source, timestamp, actor, payload, and evidence ID.
-- The seed state must be deterministic across fresh process starts.
-- Domain code must not calculate AI explanations.
-
-## Acceptance Criteria
-
-- All seven nodes exist in the seed graph.
-- Manager Approval and HR Verification are completed.
-- Laptop Allocation is the missing dependency.
-- Identity Access and downstream nodes reflect that dependency.
-- Store reads are immutable snapshots.
-- Domain unit tests cover dependency propagation, cloning, event ingestion, and deterministic seeding.
+- A judge can identify the root blocker in two seconds.
+- The dependency line makes downstream blockage obvious.
+- Evidence is visible without leaving the widget.
+- Simulation clearly distinguishes projected state from live state.
+- Execution visibly changes the station state and audit log.
+- The widget works in light and dark NitroStudio themes and remains legible on narrow screens.
 
 ## Completion Protocol
 
