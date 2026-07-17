@@ -17,12 +17,12 @@ You own:
 - Root scripts and NitroStack configuration when integration requires them
 - MCP integration tests under `tests/mcp/**`
 
-Do not implement Y's domain store, Am's rule engine, or G's widget UI. Import their public interfaces instead.
+Do not implement G's domain store, Am's rule engine, or Y's widget UI. Import their public interfaces instead.
 
 ## Implementation Tasks
 
 1. Replace the Phase 1 status module with the HandoffOS workflow module.
-2. Wire Y's workflow store and Am's analysis service through dependency injection.
+2. Wire G's workflow store and Am's analysis service through dependency injection.
 3. Expose exactly these MCP resources:
 
    - `workflow://onboard-priya/state`
