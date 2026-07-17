@@ -16,13 +16,12 @@ This is the append-only team tracker. Every repository change must add a dated e
 - 2026-07-17 | Am | Phase 3: analyzeWorkflow returns findings, root blocker (laptop-allocation), critical path, health (62), and completion estimate. Health formula: max(0, 100 - total risk points). | Files: `src/analysis/analyze.ts`, `src/analysis/index.ts` | Verification: initial health verified at 62.
 - 2026-07-17 | Am | Phase 3: simulateResolution deep-clones state, resolves node, propagates statuses, returns before/after health with findings delta. Laptop allocation simulation: health 62 → 86. Original state unchanged. | Files: `src/analysis/simulate.ts` | Verification: simulation test passes, state immutability verified.
 - 2026-07-17 | Am | Phase 6 (partial): 35 tests covering all 7 rules, health scoring, critical path, root blocker, downstream nodes, simulation isolation, finding stability, and evidence traceability. | Files: `tests/rules/rules.test.ts` | Verification: `node --experimental-strip-types --test tests/rules/rules.test.ts` — 35/35 pass.
+- 2026-07-17 | Y | Phase 5 transit-map widget replaced the Phase 1 status card with a responsive dashboard at `src/widgets/app/handoff-dashboard/page.tsx`, added a legacy route shim, refreshed widget metadata, and documented that Ad still needs to wire `detect_blockers`, `simulate_resolution`, and `execute_action` outputs to the new typed shape. | Files: `src/widgets/app/handoff-dashboard/page.tsx`, `src/widgets/app/handoffos-status/page.tsx`, `src/widgets/app/layout.tsx`, `src/widgets/widget-manifest.json`, `Done.md` | Verification: pending local widget build once NitroStack/widget dependencies are installed | Commit: not committed
 
 ## In Progress
 
-- Phase 2: Workflow domain contracts and deterministic Priya onboarding seed.
-- Phase 3: Rules, evidence, health score, and simulation.
-- Phase 4: MCP workflow resources, tools, and prompts.
-- Phase 5: Transit-map dashboard widget.
+- Phase 4: Connect the MCP application ports to G's workflow state service and Am's analysis service.
+- Phase 5: Connect the transit-map widget to the final MCP tool output and complete widget verification.
 - Phase 6: Automated tests and demo rehearsal.
 - Phase 7: NitroCloud deployment.
 
