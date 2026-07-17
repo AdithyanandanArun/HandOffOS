@@ -76,13 +76,15 @@ Team ownership and the shared progress tracker are documented in [Ad.md](Ad.md),
 
 ## Local Development
 
-Once Phase 1 dependencies are installed:
+Build the MCP server and static widget bundle before opening Studio:
 
 ```bash
-npm run dev
+npm run build
 ```
 
-Use NitroStudio to inspect MCP resources, call tools, preview widgets, and test the demo flow.
+Then open `/home/adithyan/Documents/HandOffOS` in NitroStudio. Studio launches the MCP process and the read-only widget server itself; do not also run `npm run dev`.
+
+Do not run `npm run build` while Studio is open: rebuilding updates `src/widgets/out` and Studio deliberately reloads the project. Studio connects to the MCP server through stdio, not the widget URL.
 
 ## Principle
 

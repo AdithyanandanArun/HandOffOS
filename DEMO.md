@@ -3,10 +3,12 @@
 ## Setup
 
 ```bash
-npm run dev
+npm run build
 ```
 
-Connect NitroStudio to the local HandoffOS server. The in-memory Priya workflow resets whenever the server restarts.
+Open `/home/adithyan/Documents/HandOffOS` in NitroStudio after the build completes. The in-memory Priya workflow resets whenever the server restarts.
+
+Studio starts the static dashboard widget server on port `3001` and connects to the MCP server through stdio. Do not run `npm run dev` or rebuild the project while Studio is open, because either action changes project files and makes Studio reload.
 
 ## Story
 

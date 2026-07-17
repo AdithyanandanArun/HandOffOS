@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001 --port 3001",
+    "dev": "node scripts/serve-static.mjs",
+    "dev:next": "node scripts/prepare-dev-cache.mjs && next dev -p 3001 --port 3001",
     "build": "next build",
     "start": "next start -p 3001"
   },
