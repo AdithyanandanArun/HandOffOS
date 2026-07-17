@@ -28,6 +28,9 @@ import { SystemHealthCheck } from './health/system.health.js';
   providers: [
     // Health Checks
     SystemHealthCheck,
+    // Provide a null OAUTH_CONFIG so NitroStack's OAuthModule DI token resolves
+    // without throwing. OAuthModule disables itself gracefully when config is null.
+    { provide: 'OAUTH_CONFIG', useValue: null },
   ]
 })
-export class AppModule {}
+export class AppModule { }
