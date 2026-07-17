@@ -1,11 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSeedState } from '../../src/workflow/seed.js';
-import { evaluateAllRules, computeCriticalPath, findRootBlocker, getDownstreamNodes, ALL_RULES } from '../../src/rules/engine.js';
-import { analyzeWorkflow, calculateHealth } from '../../src/analysis/analyze.js';
-import { simulateResolution } from '../../src/analysis/simulate.js';
-import { demoNow } from '../../src/domain/demo-clock.js';
-import type { WorkflowState, Finding } from '../../src/domain/types.js';
+import { createSeedState } from '../../src/workflow/seed.ts';
+import { evaluateAllRules, computeCriticalPath, findRootBlocker, getDownstreamNodes, ALL_RULES } from '../../src/rules/engine.ts';
+import { analyzeWorkflow, calculateHealth } from '../../src/analysis/analyze.ts';
+import { simulateResolution } from '../../src/analysis/simulate.ts';
+import { demoNow } from '../../src/domain/demo-clock.ts';
+import type { WorkflowState, Finding } from '../../src/domain/types.ts';
 
 function seedState(): WorkflowState {
   return createSeedState();

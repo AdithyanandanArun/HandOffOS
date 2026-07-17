@@ -69,12 +69,17 @@ Health is calculated rather than invented:
 health = max(0, 100 - total risk points)
 ```
 
-The seeded demo starts at 62. Risk points are deterministic:
+The seeded demo starts at 62. Risk points are deterministic and calibrated to avoid double-counting correlated symptoms:
 
-- Blocked node: 30
-- SLA overdue: 20
-- Critical-path block: 25
-- Each blocked downstream node: 10
+- Missing owner: 5
+- Missing external dependency: 10
+- SLA overdue: 9 per affected node
+- Missing document: 5
+- Critical-path block: 5
+- Stale approval: 0 (informational evidence)
+- Missing calendar event: 5
+
+The seed therefore has 38 risk points: missing laptop dependency (10), laptop and orientation SLA findings (18), critical-path block (5), and missing orientation calendar event (5). Completing Laptop Allocation removes 24 points, leaving 14 and producing health 86.
 
 Simulation runs against a cloned state. It returns the before/after health score, estimated completion, new critical path, and findings resolved or introduced. It does not modify the live workflow.
 

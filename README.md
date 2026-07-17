@@ -68,19 +68,23 @@ manager_summary
 
 ## Status
 
-Phase 1 establishes the NitroStack application foundation. The full product plan is in [Plan.md](Plan.md), and the phased implementation checklist is in [implementation.md](implementation.md).
+Phases 1 through 4 are implemented for the seeded Priya onboarding demo: the NitroStack MCP surface is wired to deterministic workflow state, rules, simulation, approved execution, audit history, and the transit-map output contract. The full product plan is in [Plan.md](Plan.md), and the phased implementation checklist is in [implementation.md](implementation.md).
+
+The repeatable judge flow is in [DEMO.md](DEMO.md).
 
 Team ownership and the shared progress tracker are documented in [Ad.md](Ad.md), [Y.md](Y.md), [Am.md](Am.md), [G.md](G.md), and [Done.md](Done.md).
 
 ## Local Development
 
-Once Phase 1 dependencies are installed:
+Build the MCP server and static widget bundle before opening Studio:
 
 ```bash
-npm run dev
+npm run build
 ```
 
-Use NitroStudio to inspect MCP resources, call tools, preview widgets, and test the demo flow.
+Then open `/home/adithyan/Documents/HandOffOS` in NitroStudio. Studio launches the MCP process and the read-only widget server itself; do not also run `npm run dev`.
+
+Do not run `npm run build` while Studio is open: rebuilding updates `src/widgets/out` and Studio deliberately reloads the project. Studio connects to the MCP server through stdio, not the widget URL.
 
 ## Principle
 
