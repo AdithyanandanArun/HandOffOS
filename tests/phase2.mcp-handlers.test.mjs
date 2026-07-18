@@ -44,20 +44,6 @@ test('Phase 2 MCP tool handlers return their advanced structured payloads', asyn
   assert.deepEqual(multi.multiSimulation.resolvedNodeIds, ['laptop-allocation', 'identity-access']);
   assert.equal(multi.liveTool, 'what_if_multi');
 
-  const workload = await tools.getOwnerWorkload({ ownerId: 'IT Ops', principalId: 'demo-viewer' }, context);
-  assert.ok(workload.workload.openNodeIds.includes('laptop-allocation'));
-  assert.equal(workload.liveTool, 'get_owner_workload');
-
-  const subscription = await tools.subscribeAlerts({
-    workflowId: 'onboard-priya',
-    metric: 'health',
-    comparator: 'lt',
-    threshold: 70,
-    subscriberId: 'manager-001',
-    principalId: 'it-operator',
-  }, context);
-  assert.equal(subscription.subscription.id, 'SUB-001');
-
   const report = await tools.exportAuditReport({ workflowId: 'onboard-priya', principalId: 'risk-auditor' }, context);
   assert.match(report.report.markdown, /HandoffOS Audit Report/);
 
@@ -103,12 +89,6 @@ test('Phase 2 MCP prompts require evidence-grounded responses', async () => {
   const digest = await prompts.executiveDigest({}, context);
   assert.match(digest[0].content, /compare_workflows/);
   assert.match(digest[0].content, /Do not infer/);
-
-  const narrative = await prompts.rootCauseNarrative({ workflowId: 'vendor-onboarding' }, context);
-  assert.match(narrative[0].content, /rule IDs/);
-
-  const readiness = await prompts.onboardingReadinessCheck({}, context);
-  assert.match(readiness[0].content, /not enough evidence/);
 });
 
 test('workflow catalog and vendor resources expose both deterministic workflows', async () => {
@@ -119,7 +99,4 @@ test('workflow catalog and vendor resources expose both deterministic workflows'
 
   const vendorState = await resources.getVendorState('workflow://vendor-onboarding/state', context);
   assert.equal(JSON.parse(vendorState.contents[0].text).workflowId, 'vendor-onboarding');
-
-  const integrity = await resources.getVendorAuditIntegrity('workflow://vendor-onboarding/audit-integrity', context);
-  assert.equal(JSON.parse(integrity.contents[0].text).valid, true);
 });

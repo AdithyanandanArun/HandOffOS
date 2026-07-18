@@ -41,11 +41,6 @@ export class HandoffOSResources {
     return this.getAuditLogResource(uri, context, 'onboard-priya');
   }
 
-  @Resource({ uri: 'workflow://onboard-priya/audit-integrity', name: 'Priya Onboarding Audit Integrity', description: 'SHA-256 audit-chain integrity result for Priya onboarding.', mimeType: 'application/json' })
-  async getPriyaAuditIntegrity(uri: string, context: ExecutionContext) {
-    return this.getAuditIntegrityResource(uri, context, 'onboard-priya');
-  }
-
   @Resource({ uri: 'workflow://vendor-onboarding/state', name: 'Vendor Onboarding Workflow State', description: 'Current workflow state for Acme vendor onboarding.', mimeType: 'application/json' })
   async getVendorState(uri: string, context: ExecutionContext) {
     return this.getStateResource(uri, context, 'vendor-onboarding');
@@ -64,11 +59,6 @@ export class HandoffOSResources {
   @Resource({ uri: 'workflow://vendor-onboarding/audit-log', name: 'Vendor Onboarding Audit Log', description: 'Tamper-evident audit records for vendor onboarding.', mimeType: 'application/json' })
   async getVendorAuditLog(uri: string, context: ExecutionContext) {
     return this.getAuditLogResource(uri, context, 'vendor-onboarding');
-  }
-
-  @Resource({ uri: 'workflow://vendor-onboarding/audit-integrity', name: 'Vendor Onboarding Audit Integrity', description: 'SHA-256 audit-chain integrity result for vendor onboarding.', mimeType: 'application/json' })
-  async getVendorAuditIntegrity(uri: string, context: ExecutionContext) {
-    return this.getAuditIntegrityResource(uri, context, 'vendor-onboarding');
   }
 
   @Resource({ uri: 'workflow://rules', name: 'HandoffOS Rules', description: 'Deterministic workflow rules used to create findings.', mimeType: 'application/json' })
@@ -97,8 +87,4 @@ export class HandoffOSResources {
     return jsonResource(uri, await this.application.getAuditLog(workflowId));
   }
 
-  private async getAuditIntegrityResource(uri: string, context: ExecutionContext, workflowId: string) {
-    context.logger.info('Reading workflow audit integrity', { workflowId });
-    return jsonResource(uri, await this.application.verifyAuditIntegrity(workflowId));
-  }
 }

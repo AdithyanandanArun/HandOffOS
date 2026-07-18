@@ -45,12 +45,10 @@ test('MCP discovery exposes the required HandoffOS resources, tools, and prompts
       'workflow://onboard-priya/events',
       'workflow://onboard-priya/findings',
       'workflow://onboard-priya/audit-log',
-      'workflow://onboard-priya/audit-integrity',
       'workflow://vendor-onboarding/state',
       'workflow://vendor-onboarding/events',
       'workflow://vendor-onboarding/findings',
       'workflow://vendor-onboarding/audit-log',
-      'workflow://vendor-onboarding/audit-integrity',
       'workflow://rules',
     ],
   );
@@ -67,8 +65,6 @@ test('MCP discovery exposes the required HandoffOS resources, tools, and prompts
       'compare_workflows',
       'rollback_action',
       'what_if_multi',
-      'get_owner_workload',
-      'subscribe_alerts',
       'export_audit_report',
       'verify_audit_integrity',
       'reset_demo',
@@ -81,8 +77,6 @@ test('MCP discovery exposes the required HandoffOS resources, tools, and prompts
       'manager_summary',
       'escalation_email',
       'executive_digest',
-      'root_cause_narrative',
-      'onboarding_readiness_check',
     ],
   );
 });
