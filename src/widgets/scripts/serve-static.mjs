@@ -61,7 +61,8 @@ const server = createServer((request, response) => {
 // Studio resolves localhost to ::1 on this Linux host. Omitting the host lets
 // Node bind its dual-stack listener so both IPv4 and IPv6 widget requests work.
 server.listen(port, () => {
-  console.log(`HandoffOS widget server listening on http://localhost:${port}`);
+  // NitroStudio waits for this exact readiness signal from a managed widget server.
+  console.log(`Widget server started on port ${port}`);
 });
 
 function shutdown() {
