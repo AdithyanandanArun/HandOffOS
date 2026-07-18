@@ -167,6 +167,12 @@ export interface AuditReport {
   markdown: string;
 }
 
+export interface DemoResetResult {
+  workflowIds: WorkflowId[];
+  resetAt: string;
+  states: WorkflowStateSnapshot[];
+}
+
 export interface PlannedAction {
   id: string;
   title: string;
@@ -214,6 +220,10 @@ export interface ActionPort {
 export interface AuditPort {
   getAuditLog(workflowId: WorkflowId): Promise<AuditEntry[]>;
   verifyAuditIntegrity(workflowId: WorkflowId): Promise<AuditIntegrityResult>;
+}
+
+export interface DemoPort {
+  resetDemo(actor: string): Promise<DemoResetResult>;
 }
 
 export interface Phase2Port {

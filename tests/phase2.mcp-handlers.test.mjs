@@ -13,6 +13,7 @@ globalThis.setInterval = (...args) => {
 const { createHandoffOSApplication } = await import('../dist/application/handoffos.application.js');
 const { HandoffOSPrompts } = await import('../dist/modules/handoffos/handoffos.prompts.js');
 const { HandoffOSTools } = await import('../dist/modules/handoffos/handoffos.tools.js');
+const { HandoffOSResources } = await import('../dist/modules/handoffos/handoffos.resources.js');
 
 const context = { logger: { info() {} } };
 
@@ -87,4 +88,17 @@ test('Phase 2 MCP prompts require evidence-grounded responses', async () => {
 
   const readiness = await prompts.onboardingReadinessCheck({}, context);
   assert.match(readiness[0].content, /not enough evidence/);
+});
+
+test('workflow catalog and vendor resources expose both deterministic workflows', async () => {
+  const resources = new HandoffOSResources(createHandoffOSApplication());
+  const catalog = await resources.getCatalog('workflow://catalog', context);
+  const catalogData = JSON.parse(catalog.contents[0].text);
+  assert.deepEqual(catalogData.map((workflow) => workflow.workflowId), ['onboard-priya', 'vendor-onboarding']);
+
+  const vendorState = await resources.getVendorState('workflow://vendor-onboarding/state', context);
+  assert.equal(JSON.parse(vendorState.contents[0].text).workflowId, 'vendor-onboarding');
+
+  const integrity = await resources.getVendorAuditIntegrity('workflow://vendor-onboarding/audit-integrity', context);
+  assert.equal(JSON.parse(integrity.contents[0].text).valid, true);
 });

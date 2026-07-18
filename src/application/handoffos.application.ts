@@ -9,6 +9,8 @@ import type {
   AuditPort,
   BlockerAnalysis,
   CompletionForecast,
+  DemoPort,
+  DemoResetResult,
   EscalationPayload,
   FindingSnapshot,
   PlannedAction,
@@ -31,7 +33,7 @@ import { HandoffOSRuntime } from './handoffos.runtime.js';
 export class HandoffOSApplication {
   private readonly plannedActionsByWorkflow = new Map<WorkflowId, Map<string, PlannedAction>>();
 
-  constructor(private readonly runtime: WorkflowPort & AnalysisPort & ActionPort & AuditPort & Phase2Port) {}
+  constructor(private readonly runtime: WorkflowPort & AnalysisPort & ActionPort & AuditPort & DemoPort & Phase2Port) {}
 
   getState(workflowId: WorkflowId): Promise<WorkflowStateSnapshot> {
     return this.runtime.getState(workflowId);
@@ -51,6 +53,12 @@ export class HandoffOSApplication {
 
   verifyAuditIntegrity(workflowId: WorkflowId): Promise<AuditIntegrityResult> {
     return this.runtime.verifyAuditIntegrity(workflowId);
+  }
+
+  async resetDemo(actor: string): Promise<DemoResetResult> {
+    const result = await this.runtime.resetDemo(actor);
+    this.plannedActionsByWorkflow.clear();
+    return result;
   }
 
   getRules(): Promise<RuleDefinition[]> {

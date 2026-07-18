@@ -84,3 +84,30 @@ test('Phase 2 rollback is approval-gated and multi-simulation does not mutate li
   const liveState = await app.getState('onboard-priya');
   assert.equal(liveState.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'blocked');
 });
+
+test('demo reset restores both workflow seeds and starts fresh audit chains', async () => {
+  const app = createHandoffOSApplication();
+  const plans = await app.planNextActions('onboard-priya');
+  await app.executeAction('onboard-priya', plans[0].id, 'IT Director');
+  await app.subscribeAlerts({
+    workflowId: 'onboard-priya',
+    metric: 'health',
+    comparator: 'lt',
+    threshold: 70,
+    subscriberId: 'manager-001',
+  });
+
+  const reset = await app.resetDemo('workflow-admin');
+  assert.deepEqual(reset.workflowIds, ['onboard-priya', 'vendor-onboarding']);
+  assert.equal(reset.states.find((state) => state.workflowId === 'onboard-priya')?.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'blocked');
+  assert.equal((await app.getAuditLog('onboard-priya')).length, 1);
+  assert.equal((await app.verifyAuditIntegrity('onboard-priya')).valid, true);
+  const nextSubscription = await app.subscribeAlerts({
+    workflowId: 'onboard-priya',
+    metric: 'health',
+    comparator: 'lt',
+    threshold: 70,
+    subscriberId: 'manager-001',
+  });
+  assert.equal(nextSubscription.id, 'SUB-001');
+});

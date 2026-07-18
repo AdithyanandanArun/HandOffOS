@@ -32,6 +32,8 @@ import type {
   PlannedAction,
   Phase2Port,
   CompletionForecast,
+  DemoPort,
+  DemoResetResult,
   MultiSimulationResult,
   OwnerWorkloadResult,
   RollbackActionResult,
@@ -225,7 +227,7 @@ function eventEvidence(event: SourceEvent): Evidence {
 }
 
 @Injectable()
-export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort, AuditPort, Phase2Port {
+export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort, AuditPort, DemoPort, Phase2Port {
   private readonly updatedAtByWorkflow = new Map<WorkflowId, Date>();
   private readonly store: WorkflowStateStore;
   private readonly alertSubscriptions = new AlertSubscriptionStore();
@@ -233,11 +235,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
 
   constructor() {
     this.store = new InMemoryWorkflowStateStore();
-    for (const seedState of createSeedStates()) {
-      const seed = applyAnalysis(seedState);
-      this.store.setState(seed);
-      this.updatedAtByWorkflow.set(seed.workflowId, demoNow());
-    }
+    this.loadSeedStates();
   }
 
   async getState(workflowId: WorkflowId): Promise<WorkflowStateSnapshot> {
@@ -564,6 +562,37 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
   async verifyAuditIntegrity(workflowId: WorkflowId): Promise<AuditIntegrityResult> {
     const integrity = verifyAuditIntegrity(requireState(this.store, workflowId).auditLog);
     return { workflowId, ...integrity };
+  }
+
+  async resetDemo(actor: string): Promise<DemoResetResult> {
+    this.store.clear();
+    this.updatedAtByWorkflow.clear();
+    this.alertSubscriptions.clear();
+    this.nextSubscriptionNumber = 1;
+    this.loadSeedStates(actor);
+    const workflowIds = this.store.listWorkflowIds();
+    return {
+      workflowIds,
+      resetAt: demoNow().toISOString(),
+      states: await Promise.all(workflowIds.map((workflowId) => this.getState(workflowId))),
+    };
+  }
+
+  private loadSeedStates(resetActor?: string): void {
+    for (const seedState of createSeedStates()) {
+      const seed = applyAnalysis(seedState);
+      if (resetActor) {
+        appendAuditEntry(seed, {
+          id: 'AUD-001',
+          timestamp: demoNow(),
+          action: 'Demo reset',
+          actor: resetActor,
+          details: { summary: 'Restored the deterministic seeded workflow state.', workflowId: seed.workflowId },
+        });
+      }
+      this.store.setState(seed);
+      this.updatedAtByWorkflow.set(seed.workflowId, demoNow());
+    }
   }
 
   private commit(state: WorkflowState, updatedAt: Date): void {
