@@ -1,121 +1,360 @@
 # HandoffOS
 
-> **HandoffOS makes invisible enterprise handoffs visible, explainable, and actionable.**
+> **Enterprise Workflow Intelligence through MCP**
+>
+> **Rules detect. AI explains. MCP acts.**
 
-**Rules detect. AI explains. MCP acts.**
+![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-MCP-blue)
+![NitroStack](https://img.shields.io/badge/Built%20with-NitroStack-0A66FF)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-HandoffOS is a Workflow Intelligence Engine exposed through MCP. It reconstructs work that crosses enterprise systems, detects blockers with deterministic rules, shows the evidence behind every finding, simulates approved resolutions, and updates the workflow state when an action is executed.
+---
 
-The first demo workflow is **new-hire onboarding** for Priya Nair:
+## Overview
 
-```text
-Manager Approval -> HR Verification -> Laptop Allocation -> Identity Access
-                  -> VPN Setup -> Developer Access -> Orientation
+Large enterprises don't lose productivity because employees cannot communicate—they lose productivity because work gets **stuck during handoffs between teams**.
+
+Manager approval may be complete, but HR assumes IT has already created a laptop request. Identity provisioning cannot begin until the laptop is allocated, VPN access depends on identity, and onboarding stalls because no system understands the complete workflow.
+
+**HandoffOS** solves this problem by reconstructing enterprise events into a **live workflow state**, detecting bottlenecks using deterministic business rules, explaining them with AI-backed natural language, and exposing workflow capabilities through the **Model Context Protocol (MCP)**.
+
+Rather than acting as another enterprise chatbot, HandoffOS functions as a **Workflow Intelligence Engine** that any MCP-compatible AI client can use.
+
+---
+
+# Problem Statement
+
+Modern enterprises operate using multiple disconnected systems such as:
+
+- HR Platforms
+- Ticketing Systems
+- Email
+- Calendar
+- Documentation
+- Task Boards
+
+Each platform understands only a small portion of an organization's workflow.
+
+This creates problems such as:
+
+- Unknown workflow bottlenecks
+- Missed SLAs
+- Poor ownership visibility
+- Delayed onboarding
+- Manual follow-ups
+- Lack of operational transparency
+
+Organizations know **tasks**.
+
+They rarely know the **state of the workflow**.
+
+---
+
+# Solution
+
+HandoffOS continuously transforms enterprise events into a single workflow graph.
+
+Instead of showing independent tasks, it understands:
+
+- Workflow Dependencies
+- Ownership
+- Critical Paths
+- Workflow Health
+- Business Rules
+
+The system identifies the root blocker, explains why it exists using evidence, predicts downstream impact, and recommends or executes the next approved action.
+
+---
+
+# Key Features
+
+### Live Workflow State
+
+Visualizes the current workflow and immediately highlights blocked stages.
+
+---
+
+### Deterministic Rules Engine
+
+Business logic detects:
+
+- Missing Dependencies
+- Missing Owners
+- SLA Violations
+- Critical Path Blocks
+- Missing Documentation
+
+Rules determine facts.
+
+AI never invents them.
+
+---
+
+### Evidence-Based Explanations
+
+Every blocker includes supporting evidence such as:
+
+- Completed approvals
+- Missing tasks
+- Dependency chains
+- Rule violations
+
+This eliminates hallucinations and increases trust.
+
+---
+
+### Workflow Health Score
+
+Calculates workflow health based on measurable factors including:
+
+- Blocked Nodes
+- SLA Violations
+- Critical Path Risk
+- Downstream Impact
+
+The score is explainable and reproducible.
+
+---
+
+### Workflow Simulation
+
+"What happens if this blocker is resolved?"
+
+The workflow is recalculated instantly, showing:
+
+- Updated Health
+- New Critical Path
+- Estimated Completion Time
+
+---
+
+### Execute Approved Actions
+
+Supports controlled workflow execution such as:
+
+- Creating Tasks
+- Assigning Owners
+- Scheduling Activities
+- Updating Workflow State
+- Writing Audit Logs
+
+---
+
+### MCP Native
+
+HandoffOS exposes its capabilities using the **Model Context Protocol**.
+
+Any compatible client—including NitroStudio, Claude Desktop, and future MCP-enabled assistants—can access the same workflow intelligence through a standard interface.
+
+---
+
+# Architecture
+
+```
+Enterprise Events
+        │
+        ▼
+ Event Store
+        │
+        ▼
+Workflow State Builder
+        │
+        ▼
+Deterministic Rules Engine
+        │
+        ▼
+Evidence Generation
+        │
+        ▼
+MCP Server
+ ├── Resources
+ ├── Tools
+ └── Prompts
+        │
+        ▼
+NitroStudio • Claude • Cursor • MCP Clients
 ```
 
-Priya joins Monday. Manager approval and HR verification are complete, but the laptop task was never created. HandoffOS identifies Laptop Allocation as the root blocker, proves why it matters, predicts the impact, and coordinates the next approved action.
+---
 
-## Why HandoffOS
+# Demonstration Workflow
 
-Enterprise work is rarely blocked inside a single application. It stalls in the gaps between HR, IT, procurement, task boards, calendars, and email. Each system holds a partial signal; HandoffOS turns those signals into one live, explainable workflow state.
+Our prototype demonstrates **Employee Onboarding**.
 
-The dashboard is a client, not the product. The core capability is a reusable MCP server that can be used through NitroStudio, Claude, ChatGPT, or any other compatible client.
+```
+Manager Approval
+        │
+        ▼
+HR Verification
+        │
+        ▼
+Laptop Allocation
+        │
+        ▼
+Identity Access
+        │
+        ▼
+VPN Setup
+        │
+        ▼
+Developer Access
+        │
+        ▼
+Orientation
+```
 
-## MCP Surface
+If **Laptop Allocation** is delayed,
 
-Resources:
+every downstream activity becomes blocked.
 
-```text
-workflow://catalog
+HandoffOS detects the root cause immediately.
+
+---
+
+# MCP Resources
+
+```
 workflow://onboard-priya/state
+
 workflow://onboard-priya/events
+
 workflow://onboard-priya/findings
+
 workflow://onboard-priya/audit-log
-workflow://onboard-priya/audit-integrity
-workflow://vendor-apex/state
-workflow://vendor-apex/events
-workflow://vendor-apex/findings
-workflow://vendor-apex/audit-log
-workflow://vendor-apex/audit-integrity
+
 workflow://rules
 ```
 
-Tools:
+---
 
-```text
-ingest_event
-detect_blockers
-simulate_resolution
-plan_next_actions
-execute_action
-escalate_blocker
-predict_completion
-compare_workflows
-rollback_action
-what_if_multi
-get_owner_workload
-subscribe_alerts
-export_audit_report
-verify_audit_integrity
-reset_demo
-```
+# MCP Tools
 
-Prompts:
+- detect_blockers
+- simulate_resolution
+- execute_action
+- ingest_event
+- plan_next_actions
 
-```text
-explain_blocker
-manager_summary
-```
+---
 
-## Demo Story
+# MCP Prompts
 
-1. Inspect Priya's workflow state and rules through MCP.
-2. Run blocker detection to identify Laptop Allocation as the root blocker.
-3. Open evidence and see exactly which deterministic rules fired.
-4. Simulate IT completing the laptop allocation today.
-5. Review the improved health score, completion estimate, and critical path.
-6. Execute an approved action and watch the transit-map workflow update with a new audit entry.
+- explain_blocker
+- manager_summary
 
-## Stack
+---
 
-- [NitroStack](https://nitrostack.ai/) for the MCP server, tools, resources, prompts, and widgets
-- TypeScript with Zod schemas for deterministic, validated contracts
-- NitroStudio as the primary local demo and MCP testing surface
-- NitroCloud as the deployment target
+# Technology Stack
 
-## Security Model
+- TypeScript
+- Node.js
+- NitroStack
+- Model Context Protocol (MCP)
 
-Every tool invocation supplies a local demo `principalId`. The MCP server validates that identity against a role and capability policy before the tool runs. This is a deterministic demo policy boundary, not a replacement for production SSO, OAuth, or tenant isolation.
+---
 
-```text
-demo-viewer     read workflow analysis
-ops-analyst     simulate, forecast, compare, plan, escalate
-it-operator     ingest events and subscribe to alerts
-it-director     execute and roll back approved actions
-risk-auditor    export and verify tamper-evident audit chains
-workflow-admin  reset the in-memory demo
-```
-
-## Status
-
-The demo is implemented for two isolated seeded workflows: Priya's onboarding and Apex's vendor onboarding. It includes deterministic analysis, evidence, simulation, approval-gated state changes, a SHA-256 audit chain, capability enforcement, a transit-map dashboard, and demo reset. The repeatable judge flow is in [DEMO.md](DEMO.md); the append-only delivery tracker is [Done.md](Done.md).
-
-## Local Development
-
-Build the MCP server and static widget bundle before opening Studio:
+# Installation
 
 ```bash
-npm run build
+git clone https://github.com/AdithyanandanArun/HandOffOS.git
+
+cd HandOffOS
+
+npm install
 ```
 
-Then open `/home/adithyan/Documents/HandOffOS` in NitroStudio. Studio launches the MCP process and the read-only widget server itself; do not also run `npm run dev`.
+Run the server:
 
-Do not run `npm run build` while Studio is open: rebuilding updates `src/widgets/out` and Studio deliberately reloads the project. Studio connects to the MCP server through stdio, not the widget URL.
+```bash
+npm run start
+```
 
-## NitroCloud Readiness
+---
 
-The production build is generated by `npm run build`. For a NitroCloud deployment, configure `NODE_ENV=production`; NitroStack defaults to the dual MCP transport in production. Keep the local demo principals only for this seeded demo and replace them with an authenticated principal resolver before handling real enterprise data.
+# Connect Using an MCP Client
 
-## Principle
+Configure your MCP client:
 
-AI never invents operational facts. Deterministic rules establish the workflow state, findings, evidence, and risk. AI is limited to explaining that grounded information.
+```json
+{
+  "mcpServers": {
+    "handoffos": {
+      "url": "YOUR_SERVER_URL"
+    }
+  }
+}
+```
+
+Supported clients include:
+
+- NitroStudio
+- Claude Desktop
+- Cursor
+- Other MCP-compatible clients
+
+---
+
+# Potential Applications
+
+Although demonstrated using employee onboarding, HandoffOS can support:
+
+- Procurement
+- Vendor Onboarding
+- Customer Support
+- Leave Approval
+- Incident Response
+- Manufacturing Workflows
+- IT Service Management
+
+Only the workflow template changes.
+
+The engine remains the same.
+
+---
+
+# Why HandoffOS?
+
+Most AI systems answer questions.
+
+HandoffOS improves workflows.
+
+```
+Question
+     │
+     ▼
+Evidence
+     │
+     ▼
+Rules
+     │
+     ▼
+AI Explanation
+     │
+     ▼
+Simulation
+     │
+     ▼
+Approved Action
+     │
+     ▼
+Updated Workflow
+```
+
+The result is a transparent, explainable, and actionable workflow intelligence platform.
+
+---
+
+# Team
+
+Developed during the **Agentic AI Hackathon 2026**
+
+---
+
+# License
+
+MIT License
+
+---
+
+> **HandoffOS makes invisible enterprise handoffs visible, explainable, and actionable.**
