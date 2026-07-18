@@ -85,8 +85,15 @@ type OwnerWorkload = {
 };
 
 type Rollback = {
-  approvedBy: string;
+  principalId: string;
   summary: string;
+};
+
+type Authorization = {
+  principalId: string;
+  displayName: string;
+  roles: string[];
+  capability: string;
 };
 
 type MultiSimulation = {
@@ -97,6 +104,7 @@ type WidgetDashboardData = {
   workflowId: string;
   subject: string;
   liveTool?: string;
+  authorization?: Authorization;
   health: number;
   estimatedCompletion: string;
   criticalPath: string[];
@@ -146,6 +154,7 @@ type ToolOutputLike = Partial<WidgetDashboardData> & {
   rollback?: unknown;
   multiSimulation?: unknown;
   executiveDigest?: unknown;
+  authorization?: unknown;
 };
 
 type HostToolInvoker = {
@@ -266,7 +275,7 @@ const fallbackData: WidgetDashboardData = {
       id: 'ACT-002',
       label: 'Execute approved laptop allocation',
       tool: 'execute_action',
-      input: { workflowId: 'onboard-priya', actionId: 'allocate_laptop', approver: 'it-ops-manager' },
+      input: { workflowId: 'onboard-priya', actionId: 'allocate_laptop', principalId: 'it-director' },
       approvalRequired: true,
     },
   ],
@@ -324,6 +333,7 @@ function normalizeDashboardData(raw: ToolOutputLike | undefined): WidgetDashboar
     workflowId: typeof workflow.workflowId === 'string' ? workflow.workflowId : fallbackData.workflowId,
     subject: typeof workflow.subject === 'string' ? workflow.subject : fallbackData.subject,
     liveTool: typeof raw.liveTool === 'string' ? raw.liveTool : fallbackData.liveTool,
+    authorization: asObject<Authorization>(raw.authorization),
     health: typeof workflow.health === 'number' ? workflow.health : fallbackData.health,
     estimatedCompletion: typeof workflow.estimatedCompletion === 'string' ? workflow.estimatedCompletion : fallbackData.estimatedCompletion,
     criticalPath: asArray<string>(workflow.criticalPath).length > 0 ? asArray<string>(workflow.criticalPath) : fallbackData.criticalPath,
@@ -470,6 +480,19 @@ export default function HandoffDashboardWidget() {
                 Workflow {data.workflowId}
               </span>
               <span style={{ fontSize: 14, opacity: 0.76 }}>Judge target: identify the blocker in under two seconds.</span>
+              {data.authorization ? (
+                <span style={{
+                  background: isDark ? 'rgba(54, 129, 100, 0.22)' : 'rgba(215, 244, 229, 0.92)',
+                  border: `1px solid ${isDark ? 'rgba(114, 230, 169, 0.3)' : 'rgba(47, 143, 91, 0.24)'}`,
+                  borderRadius: 14,
+                  fontSize: 12,
+                  lineHeight: 1.45,
+                  padding: '8px 10px',
+                }}>
+                  <strong>{data.authorization.displayName}</strong> authorized for {data.authorization.capability}<br />
+                  <span style={{ opacity: 0.76 }}>{data.authorization.roles.join(', ')}</span>
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -843,7 +866,7 @@ export default function HandoffDashboardWidget() {
                 {data.advanced.rollback ? (
                   <div style={{ background: isDark ? 'rgba(217, 138, 25, 0.13)' : 'rgba(255, 239, 201, 0.8)', borderRadius: 14, padding: 12 }}>
                     <strong style={{ fontSize: 13 }}>Rollback recorded</strong>
-                    <p style={{ fontSize: 13, lineHeight: 1.5, margin: '6px 0 0', opacity: 0.8 }}>{data.advanced.rollback.summary} Approved by {data.advanced.rollback.approvedBy}.</p>
+                    <p style={{ fontSize: 13, lineHeight: 1.5, margin: '6px 0 0', opacity: 0.8 }}>{data.advanced.rollback.summary} Executed by {data.advanced.rollback.principalId}.</p>
                   </div>
                 ) : null}
               </div>

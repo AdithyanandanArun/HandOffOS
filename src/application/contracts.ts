@@ -77,6 +77,13 @@ export interface AuditIntegrityResult {
   reason?: 'missing_hash' | 'previous_hash_mismatch' | 'entry_hash_mismatch';
 }
 
+export interface AuthorizationContext {
+  principalId: string;
+  displayName: string;
+  roles: string[];
+  capability: string;
+}
+
 export interface BlockerAnalysis {
   workflowId: WorkflowId;
   findings: FindingSnapshot[];
@@ -135,7 +142,7 @@ export interface MultiSimulationResult {
 
 export interface RollbackActionResult {
   workflowId: WorkflowId;
-  approvedBy: string;
+  principalId: string;
   summary: string;
   state: WorkflowStateSnapshot;
   auditEntry: AuditEntry;
@@ -185,7 +192,7 @@ export interface PlannedAction {
 export interface ActionExecutionResult {
   workflowId: WorkflowId;
   actionId: string;
-  approvedBy: string;
+  principalId: string;
   summary: string;
   state: WorkflowStateSnapshot;
   auditEntry: AuditEntry;
@@ -213,7 +220,7 @@ export interface ActionPort {
   executeAction(
     workflowId: WorkflowId,
     actionId: string,
-    approvedBy: string,
+    principalId: string,
   ): Promise<ActionExecutionResult>;
 }
 
@@ -223,14 +230,14 @@ export interface AuditPort {
 }
 
 export interface DemoPort {
-  resetDemo(actor: string): Promise<DemoResetResult>;
+  resetDemo(principalId: string): Promise<DemoResetResult>;
 }
 
 export interface Phase2Port {
   escalateBlocker(workflowId: WorkflowId): Promise<EscalationPayload>;
   predictCompletion(workflowId: WorkflowId): Promise<CompletionForecast>;
   compareWorkflows(workflowIds?: WorkflowId[]): Promise<WorkflowComparison[]>;
-  rollbackAction(workflowId: WorkflowId, approvedBy: string): Promise<RollbackActionResult>;
+  rollbackAction(workflowId: WorkflowId, principalId: string): Promise<RollbackActionResult>;
   simulateMultiResolution(workflowId: WorkflowId, nodeIds: string[], resolvedAt: string): Promise<MultiSimulationResult>;
   getOwnerWorkload(ownerId: string, workflowIds?: WorkflowId[]): Promise<OwnerWorkloadResult>;
   subscribeAlerts(input: Omit<AlertSubscriptionResult, 'id' | 'createdAt'>): Promise<AlertSubscriptionResult>;

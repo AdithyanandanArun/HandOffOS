@@ -4,7 +4,13 @@ export const workflowIdSchema = z.object({
   workflowId: z.string().min(1).default('onboard-priya'),
 });
 
-export const ingestEventSchema = workflowIdSchema.extend({
+const principalIdSchema = z.object({
+  principalId: z.string().min(1),
+});
+
+const protectedWorkflowSchema = workflowIdSchema.merge(principalIdSchema);
+
+export const ingestEventSchema = protectedWorkflowSchema.extend({
   event: z.object({
     id: z.string().min(1),
     source: z.enum(['gmail', 'hr', 'task-board', 'calendar']),
@@ -16,48 +22,51 @@ export const ingestEventSchema = workflowIdSchema.extend({
   }),
 });
 
-export const simulateResolutionSchema = workflowIdSchema.extend({
+export const simulateResolutionSchema = protectedWorkflowSchema.extend({
   nodeId: z.string().min(1),
   resolvedAt: z.string().datetime(),
 });
 
-export const executeActionSchema = workflowIdSchema.extend({
+export const executeActionSchema = protectedWorkflowSchema.extend({
   actionId: z.string().min(1),
-  approvedBy: z.string().min(1),
 });
 
-export const escalateBlockerSchema = workflowIdSchema;
+export const detectBlockersSchema = protectedWorkflowSchema;
 
-export const predictCompletionSchema = workflowIdSchema;
+export const planNextActionsSchema = protectedWorkflowSchema;
 
-export const compareWorkflowsSchema = z.object({
+export const escalateBlockerSchema = protectedWorkflowSchema;
+
+export const predictCompletionSchema = protectedWorkflowSchema;
+
+export const compareWorkflowsSchema = principalIdSchema.extend({
   workflowIds: z.array(z.string().min(1)).min(1).optional(),
 });
 
-export const rollbackActionSchema = workflowIdSchema.extend({
-  approvedBy: z.string().min(1),
-});
+export const rollbackActionSchema = protectedWorkflowSchema;
 
-export const simulateMultiResolutionSchema = workflowIdSchema.extend({
+export const simulateMultiResolutionSchema = protectedWorkflowSchema.extend({
   nodeIds: z.array(z.string().min(1)).min(1),
   resolvedAt: z.string().datetime(),
 });
 
-export const getOwnerWorkloadSchema = z.object({
+export const getOwnerWorkloadSchema = principalIdSchema.extend({
   ownerId: z.string().min(1),
   workflowIds: z.array(z.string().min(1)).min(1).optional(),
 });
 
-export const subscribeAlertsSchema = workflowIdSchema.extend({
+export const subscribeAlertsSchema = protectedWorkflowSchema.extend({
   metric: z.enum(['health', 'sla_overdue', 'blocked_nodes']),
   comparator: z.enum(['lt', 'lte', 'gt', 'gte']),
   threshold: z.number().finite(),
   subscriberId: z.string().min(1),
 });
 
-export const exportAuditReportSchema = workflowIdSchema;
+export const exportAuditReportSchema = protectedWorkflowSchema;
 
-export const verifyAuditIntegritySchema = workflowIdSchema;
+export const verifyAuditIntegritySchema = protectedWorkflowSchema;
+
+export const resetDemoSchema = principalIdSchema;
 
 const nodeStatusSchema = z.enum(['completed', 'blocked', 'pending', 'ready', 'in_progress']);
 const severitySchema = z.enum(['low', 'medium', 'high', 'critical']);
@@ -112,6 +121,12 @@ const dashboardDataOutputSchema = z.object({
     })),
   }),
   liveTool: z.string(),
+  authorization: z.object({
+    principalId: z.string(),
+    displayName: z.string(),
+    roles: z.array(z.string()),
+    capability: z.string(),
+  }).optional(),
   mainBlocker: z.object({
     stationId: z.string(),
     title: z.string(),
@@ -216,7 +231,7 @@ const multiSimulationOutputSchema = z.object({
 
 const rollbackOutputSchema = z.object({
   workflowId: z.string(),
-  approvedBy: z.string(),
+  principalId: z.string(),
   summary: z.string(),
   state: workflowStateOutputSchema,
   auditEntry: z.object({
@@ -286,7 +301,7 @@ export const executeActionOutputSchema = z.object({
   execution: z.object({
     workflowId: z.string(),
     actionId: z.string(),
-    approvedBy: z.string(),
+    principalId: z.string(),
     summary: z.string(),
     state: workflowStateOutputSchema,
     auditEntry: z.object({
@@ -362,8 +377,20 @@ export const verifyAuditIntegrityOutputSchema = z.object({
   integrity: auditIntegrityOutputSchema,
 });
 
+export const resetDemoOutputSchema = z.object({
+  summary: z.string(),
+  reset: z.object({
+    workflowIds: z.array(z.string()),
+    resetAt: z.string().datetime(),
+    states: z.array(workflowStateOutputSchema),
+  }),
+});
+
 export type WorkflowIdInput = z.infer<typeof workflowIdSchema>;
+export type ProtectedWorkflowInput = z.infer<typeof protectedWorkflowSchema>;
 export type IngestEventInput = z.infer<typeof ingestEventSchema>;
+export type DetectBlockersInput = z.infer<typeof detectBlockersSchema>;
+export type PlanNextActionsInput = z.infer<typeof planNextActionsSchema>;
 export type SimulateResolutionInput = z.infer<typeof simulateResolutionSchema>;
 export type ExecuteActionInput = z.infer<typeof executeActionSchema>;
 export type EscalateBlockerInput = z.infer<typeof escalateBlockerSchema>;
@@ -375,3 +402,4 @@ export type GetOwnerWorkloadInput = z.infer<typeof getOwnerWorkloadSchema>;
 export type SubscribeAlertsInput = z.infer<typeof subscribeAlertsSchema>;
 export type ExportAuditReportInput = z.infer<typeof exportAuditReportSchema>;
 export type VerifyAuditIntegrityInput = z.infer<typeof verifyAuditIntegritySchema>;
+export type ResetDemoInput = z.infer<typeof resetDemoSchema>;

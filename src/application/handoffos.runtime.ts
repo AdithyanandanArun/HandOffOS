@@ -349,7 +349,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
   async executeAction(
     workflowId: WorkflowId,
     actionId: string,
-    approvedBy: string,
+    principalId: string,
   ): Promise<ActionExecutionResult> {
     if (!actionId.startsWith('resolve-')) {
       throw new Error(`Action "${actionId}" is not executable for this workflow.`);
@@ -373,7 +373,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
       id: `AUD-${recalculated.auditLog.length + 1}`,
       timestamp: completedAt,
       action: `${targetNode.label} completed`,
-      actor: approvedBy,
+      actor: principalId,
       details: {
         summary: `Approved action completed ${targetNode.label} and recalculated workflow health from ${beforeHealth} to ${recalculated.health}.`,
         actionId,
@@ -387,7 +387,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     return {
       workflowId,
       actionId,
-      approvedBy,
+      principalId,
       summary: `${targetNode.label} completed. Workflow health changed from ${beforeHealth} to ${recalculated.health}.`,
       state: await this.getState(workflowId),
       auditEntry: toAuditEntry(auditEntry),
@@ -449,8 +449,8 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     });
   }
 
-  async rollbackAction(workflowId: WorkflowId, approvedBy: string): Promise<RollbackActionResult> {
-    if (!approvedBy.trim()) throw new Error('An approver is required to roll back an action.');
+  async rollbackAction(workflowId: WorkflowId, principalId: string): Promise<RollbackActionResult> {
+    if (!principalId.trim()) throw new Error('A principal is required to roll back an action.');
     const current = requireState(this.store, workflowId);
     const retainedAuditLog = current.auditLog;
     const revertedEntry = retainedAuditLog.at(-1);
@@ -464,7 +464,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
       id: `AUD-${recalculated.auditLog.length + 1}`,
       timestamp: rolledBackAt,
       action: 'Approved action rolled back',
-      actor: approvedBy,
+      actor: principalId,
       details: {
         summary: 'Restored the workflow state before the most recent approved action without removing audit history.',
         workflowId,
@@ -476,7 +476,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
 
     return {
       workflowId,
-      approvedBy,
+      principalId,
       summary: 'Restored the state before the most recent approved action.',
       state: await this.getState(workflowId),
       auditEntry: toAuditEntry(auditEntry),
@@ -564,12 +564,12 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     return { workflowId, ...integrity };
   }
 
-  async resetDemo(actor: string): Promise<DemoResetResult> {
+  async resetDemo(principalId: string): Promise<DemoResetResult> {
     this.store.clear();
     this.updatedAtByWorkflow.clear();
     this.alertSubscriptions.clear();
     this.nextSubscriptionNumber = 1;
-    this.loadSeedStates(actor);
+    this.loadSeedStates(principalId);
     const workflowIds = this.store.listWorkflowIds();
     return {
       workflowIds,
