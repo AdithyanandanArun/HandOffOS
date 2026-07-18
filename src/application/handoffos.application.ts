@@ -2,16 +2,25 @@ import type {
   ActionExecutionResult,
   ActionPort,
   AnalysisPort,
+  AlertSubscriptionResult,
+  AuditReport,
   AuditEntry,
   AuditPort,
   BlockerAnalysis,
+  CompletionForecast,
+  EscalationPayload,
   FindingSnapshot,
   PlannedAction,
+  Phase2Port,
+  MultiSimulationResult,
+  OwnerWorkloadResult,
+  RollbackActionResult,
   RuleDefinition,
   SimulationResult,
   WorkflowEventInput,
   WorkflowId,
   WorkflowPort,
+  WorkflowComparison,
   WorkflowStateSnapshot,
 } from './contracts.js';
 import { Injectable } from '@nitrostack/core';
@@ -21,7 +30,7 @@ import { HandoffOSRuntime } from './handoffos.runtime.js';
 export class HandoffOSApplication {
   private readonly plannedActionsByWorkflow = new Map<WorkflowId, Map<string, PlannedAction>>();
 
-  constructor(private readonly runtime: WorkflowPort & AnalysisPort & ActionPort & AuditPort) {}
+  constructor(private readonly runtime: WorkflowPort & AnalysisPort & ActionPort & AuditPort & Phase2Port) {}
 
   getState(workflowId: WorkflowId): Promise<WorkflowStateSnapshot> {
     return this.runtime.getState(workflowId);
@@ -85,6 +94,38 @@ export class HandoffOSApplication {
     const result = await this.runtime.executeAction(workflowId, actionId, approvedBy);
     this.plannedActionsByWorkflow.get(workflowId)?.delete(actionId);
     return result;
+  }
+
+  escalateBlocker(workflowId: WorkflowId): Promise<EscalationPayload> {
+    return this.runtime.escalateBlocker(workflowId);
+  }
+
+  predictCompletion(workflowId: WorkflowId): Promise<CompletionForecast> {
+    return this.runtime.predictCompletion(workflowId);
+  }
+
+  compareWorkflows(workflowIds?: WorkflowId[]): Promise<WorkflowComparison[]> {
+    return this.runtime.compareWorkflows(workflowIds);
+  }
+
+  rollbackAction(workflowId: WorkflowId, approvedBy: string): Promise<RollbackActionResult> {
+    return this.runtime.rollbackAction(workflowId, approvedBy);
+  }
+
+  simulateMultiResolution(workflowId: WorkflowId, nodeIds: string[], resolvedAt: string): Promise<MultiSimulationResult> {
+    return this.runtime.simulateMultiResolution(workflowId, nodeIds, resolvedAt);
+  }
+
+  getOwnerWorkload(ownerId: string, workflowIds?: WorkflowId[]): Promise<OwnerWorkloadResult> {
+    return this.runtime.getOwnerWorkload(ownerId, workflowIds);
+  }
+
+  subscribeAlerts(input: Omit<AlertSubscriptionResult, 'id' | 'createdAt'>): Promise<AlertSubscriptionResult> {
+    return this.runtime.subscribeAlerts(input);
+  }
+
+  exportAuditReport(workflowId: WorkflowId): Promise<AuditReport> {
+    return this.runtime.exportAuditReport(workflowId);
   }
 }
 
