@@ -62,8 +62,6 @@ export const SEED_EVENTS: SourceEvent[] = [
     actor: 'HR System',
     type: 'invite_cancelled',
     payload: {
-      // Title deliberately does not contain 'orientation' so R-007 (which checks for
-      // an active calendar slot by nodeId substring) correctly reports the slot as missing.
       title: 'Priya Nair — New-Hire Welcome Session (CANCELLED)',
       sessionType: 'new_hire_induction',
       scheduledFor: '2025-01-14T09:00:00Z',
@@ -71,6 +69,54 @@ export const SEED_EVENTS: SourceEvent[] = [
       attendees: ['priya.nair@company.com', 'hr@company.com'],
     },
     evidenceId: 'EVD-005',
+  },
+  {
+    id: 'EVT-006',
+    source: 'hr-system',
+    timestamp: new Date('2025-01-07T11:40:00Z'),
+    actor: 'HR System',
+    type: 'task_created',
+    payload: {
+      taskId: 'laptop-allocation',
+      title: 'Deploy hardware',
+    },
+    evidenceId: 'EVD-007',
+  },
+  {
+    id: 'EVT-007',
+    source: 'gmail',
+    timestamp: new Date('2025-01-08T10:00:00Z'),
+    actor: 'Rajesh Kumar',
+    type: 'task_created',
+    payload: {
+      taskId: 'laptop-allocation',
+      title: 'Procure laptop',
+    },
+    evidenceId: 'EVD-008',
+  },
+  {
+    id: 'EVT-008',
+    source: 'task-board',
+    timestamp: new Date('2025-01-08T15:00:00Z'),
+    actor: 'IT Ops',
+    type: 'status_updated',
+    payload: {
+      nodeId: 'vpn-setup',
+      status: 'completed',
+    },
+    evidenceId: 'EVD-009',
+  },
+  {
+    id: 'EVT-009',
+    source: 'gmail',
+    timestamp: new Date('2025-01-08T15:30:00Z'),
+    actor: 'IT Network',
+    type: 'status_updated',
+    payload: {
+      nodeId: 'vpn-setup',
+      status: 'blocked',
+    },
+    evidenceId: 'EVD-010',
   },
 ];
 
@@ -116,5 +162,33 @@ export const SEED_EVIDENCE: Evidence[] = [
     type: 'event',
     description: 'Manager signoff approval from Rajesh Kumar on 2025-01-08, now 7 days old without downstream action.',
     timestamp: new Date('2025-01-08T14:00:00Z'),
+  },
+  {
+    id: 'EVD-007',
+    sourceEventId: 'EVT-006',
+    type: 'event',
+    description: 'HR System event creating Laptop Allocation task.',
+    timestamp: new Date('2025-01-07T11:40:00Z'),
+  },
+  {
+    id: 'EVD-008',
+    sourceEventId: 'EVT-007',
+    type: 'event',
+    description: 'Manager email requesting Laptop procurement, creating duplicate Laptop Allocation task.',
+    timestamp: new Date('2025-01-08T10:00:00Z'),
+  },
+  {
+    id: 'EVD-009',
+    sourceEventId: 'EVT-008',
+    type: 'event',
+    description: 'Task board reports VPN Setup is completed.',
+    timestamp: new Date('2025-01-08T15:00:00Z'),
+  },
+  {
+    id: 'EVD-010',
+    sourceEventId: 'EVT-009',
+    type: 'event',
+    description: 'IT Network email reports VPN Setup is blocked due to credentials.',
+    timestamp: new Date('2025-01-08T15:30:00Z'),
   },
 ];

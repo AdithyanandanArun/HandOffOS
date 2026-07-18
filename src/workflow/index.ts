@@ -11,4 +11,6 @@ export {
   findRootBlocker,
   deriveNodeStatus,
   propagateStatuses,
+  getOwnerWorkload,
 } from './graph.js';
+
