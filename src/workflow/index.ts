@@ -1,5 +1,7 @@
 export { WorkflowStateStore, InMemoryWorkflowStateStore } from './state-store.js';
-export { createSeedState } from './seed.js';
+export { AlertSubscriptionStore } from './alerts.js';
+export { getOwnerWorkload } from './workload.js';
+export { createSeedState, createVendorOnboardingState, createSeedStates } from './seed.js';
 export {
   areDependenciesComplete,
   getIncompleteDependencies,
