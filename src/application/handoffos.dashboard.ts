@@ -50,6 +50,7 @@ export interface HandoffDashboardData {
     affectedNodes: string[];
     evidenceIds: string[];
     riskPoints: number;
+    confidence: 'strong' | 'weak';
   }>;
   evidence: Array<{
     id: string;
@@ -164,6 +165,7 @@ export function createDashboardData(input: {
       affectedNodes: finding.affectedNodeIds.map((id) => nodeById.get(id)?.label ?? id),
       evidenceIds: finding.evidenceIds,
       riskPoints: finding.riskPoints,
+      confidence: finding.confidence,
     })),
     evidence: analysis.evidence.map((evidence) => ({
       id: evidence.id,

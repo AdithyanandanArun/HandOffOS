@@ -11,6 +11,12 @@ export interface AnalysisResult {
   estimatedCompletion: Date | null;
 }
 
+export interface CompletionForecast {
+  estimatedCompletion: Date | null;
+  criticalPath: string[];
+  delayDrivers: Array<{ nodeId: string; reasons: string[]; sla: Date | null }>;
+}
+
 export function calculateHealth(findings: Finding[]): { health: number; breakdown: { ruleId: string; findingId: string; riskPoints: number }[] } {
   const breakdown = findings
     .filter(f => f.riskPoints > 0)
@@ -36,6 +42,26 @@ export function estimateCompletion(state: WorkflowState): Date | null {
   const daysRemaining = incompleteOnPath.length * ESTIMATED_TASK_DURATION_DAYS;
   const estimate = new Date(now.getTime() + daysRemaining * 24 * 60 * 60 * 1000);
   return estimate;
+}
+
+export function predictCompletion(state: WorkflowState): CompletionForecast {
+  const analysis = analyzeWorkflow(state);
+  const delayDrivers = analysis.criticalPath
+    .map((nodeId) => {
+      const node = state.nodes.find((candidate) => candidate.id === nodeId);
+      if (!node || node.status === 'completed') return undefined;
+      const reasons = analysis.findings
+        .filter((finding) => finding.affectedNodeIds.includes(nodeId))
+        .map((finding) => `${finding.ruleId}: ${finding.title}`);
+      return { nodeId, reasons, sla: node.sla ?? null };
+    })
+    .filter((driver): driver is NonNullable<typeof driver> => Boolean(driver));
+
+  return {
+    estimatedCompletion: analysis.estimatedCompletion,
+    criticalPath: analysis.criticalPath,
+    delayDrivers,
+  };
 }
 
 export function analyzeWorkflow(state: WorkflowState): AnalysisResult {

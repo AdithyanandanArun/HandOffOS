@@ -1,7 +1,7 @@
 import { Injectable } from '@nitrostack/core';
-import { analyzeWorkflow, applyAnalysis } from '../analysis/analyze.js';
-import { simulateResolution } from '../analysis/simulate.js';
-import { demoNow, PRIYA_JOINING_DATE } from '../domain/demo-clock.js';
+import { analyzeWorkflow, applyAnalysis, predictCompletion } from '../analysis/analyze.js';
+import { simulateMultiResolution, simulateResolution } from '../analysis/simulate.js';
+import { demoNow } from '../domain/demo-clock.js';
 import type {
   AuditEntry as DomainAuditEntry,
   Evidence,
@@ -11,27 +11,38 @@ import type {
   WorkflowState,
 } from '../domain/types.js';
 import { ALL_RULES } from '../rules/engine.js';
-import { createSeedState, createVendorSeedState } from '../workflow/seed.js';
+import { AlertSubscriptionStore } from '../workflow/alerts.js';
+import { createSeedStates } from '../workflow/seed.js';
 import { InMemoryWorkflowStateStore, type WorkflowStateStore } from '../workflow/state-store.js';
+import { appendAuditEntry, verifyAuditIntegrity } from '../workflow/audit.js';
+import { getOwnerWorkload } from '../workflow/workload.js';
 import type {
   ActionExecutionResult,
   ActionPort,
   AnalysisPort,
+  AlertSubscriptionResult,
+  AuditReport,
   AuditEntry,
+  AuditIntegrityResult,
   AuditPort,
   BlockerAnalysis,
   EvidenceReference,
+  EscalationPayload,
   FindingSnapshot,
   PlannedAction,
+  Phase2Port,
+  CompletionForecast,
+  MultiSimulationResult,
+  OwnerWorkloadResult,
+  RollbackActionResult,
   RuleDefinition,
   SimulationResult,
   WorkflowEventInput,
   WorkflowId,
   WorkflowPort,
+  WorkflowComparison,
   WorkflowStateSnapshot,
 } from './contracts.js';
-
-const LAPTOP_RESOLUTION_ACTION_ID = 'resolve-laptop-allocation';
 
 function requireState(store: WorkflowStateStore, workflowId: WorkflowId): WorkflowState {
   const state = store.getState(workflowId);
@@ -45,6 +56,7 @@ function requireState(store: WorkflowStateStore, workflowId: WorkflowId): Workfl
 // The shared in-memory store clones through JSON to protect its internal state.
 // Restore Date values at the MCP boundary before deterministic rule evaluation.
 function rehydrateDates(state: WorkflowState): void {
+  state.targetDate = new Date(state.targetDate);
   if (state.estimatedCompletion) state.estimatedCompletion = new Date(state.estimatedCompletion);
   for (const node of state.nodes) {
     if (node.sla) node.sla = new Date(node.sla);
@@ -66,16 +78,29 @@ function toWorkflowEvent(event: SourceEvent): WorkflowEventInput {
     type: event.type,
     timestamp: event.timestamp.toISOString(),
     actor: event.actor,
-    payload: event.payload,
+    payload: {
+      ...event.payload,
+      ...(event.nodeId ? { nodeId: event.nodeId } : {}),
+      ...(event.logicalTaskKey ? { logicalTaskKey: event.logicalTaskKey } : {}),
+      ...(event.reportedStatus ? { reportedStatus: event.reportedStatus } : {}),
+    },
     evidenceId: event.evidenceId,
   };
 }
 
 function toSourceEvent(event: WorkflowEventInput): SourceEvent {
+  const nodeId = typeof event.payload.nodeId === 'string' ? event.payload.nodeId : undefined;
+  const logicalTaskKey = typeof event.payload.logicalTaskKey === 'string' ? event.payload.logicalTaskKey : undefined;
+  const reportedStatus = isNodeStatus(event.payload.reportedStatus)
+    ? event.payload.reportedStatus
+    : isNodeStatus(event.payload.status) ? event.payload.status : undefined;
   return {
     ...event,
     source: event.source === 'hr' ? 'hr-system' : event.source,
     timestamp: new Date(event.timestamp),
+    nodeId,
+    logicalTaskKey,
+    reportedStatus,
   };
 }
 
@@ -89,6 +114,7 @@ function toFinding(finding: Finding): FindingSnapshot {
     evidenceIds: [...finding.evidenceIds],
     affectedNodeIds: [...finding.affectedNodeIds],
     riskPoints: finding.riskPoints,
+    confidence: finding.confidence ?? 'weak',
   };
 }
 
@@ -101,7 +127,7 @@ function toStateSnapshot(state: WorkflowState, updatedAt: Date): WorkflowStateSn
   return {
     workflowId: state.workflowId,
     employee: state.subject,
-    joiningDate: PRIYA_JOINING_DATE.toISOString(),
+    joiningDate: state.targetDate.toISOString(),
     status: workflowStatus(state),
     healthScore: state.health,
     mainBlocker: state.rootBlocker ?? undefined,
@@ -118,6 +144,7 @@ function toStateSnapshot(state: WorkflowState, updatedAt: Date): WorkflowStateSn
       completedAt: node.completedAt?.toISOString(),
     })),
     updatedAt: updatedAt.toISOString(),
+    targetDate: state.targetDate.toISOString(),
   };
 }
 
@@ -154,6 +181,8 @@ function toAuditEntry(entry: DomainAuditEntry): AuditEntry {
     details: typeof entry.details.summary === 'string'
       ? entry.details.summary
       : JSON.stringify(entry.details),
+    previousHash: entry.previousHash,
+    hash: entry.hash,
   };
 }
 
@@ -196,19 +225,19 @@ function eventEvidence(event: SourceEvent): Evidence {
 }
 
 @Injectable()
-export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort, AuditPort {
+export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort, AuditPort, Phase2Port {
   private readonly updatedAtByWorkflow = new Map<WorkflowId, Date>();
   private readonly store: WorkflowStateStore;
+  private readonly alertSubscriptions = new AlertSubscriptionStore();
+  private nextSubscriptionNumber = 1;
 
   constructor() {
     this.store = new InMemoryWorkflowStateStore();
-    const seed = applyAnalysis(createSeedState());
-    this.store.setState(seed);
-    this.updatedAtByWorkflow.set(seed.workflowId, demoNow());
-
-    const seedVendor = applyAnalysis(createVendorSeedState());
-    this.store.setState(seedVendor);
-    this.updatedAtByWorkflow.set(seedVendor.workflowId, demoNow());
+    for (const seedState of createSeedStates()) {
+      const seed = applyAnalysis(seedState);
+      this.store.setState(seed);
+      this.updatedAtByWorkflow.set(seed.workflowId, demoNow());
+    }
   }
 
   async getState(workflowId: WorkflowId): Promise<WorkflowStateSnapshot> {
@@ -243,7 +272,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     }
 
     const updatedAt = sourceEvent.timestamp;
-    state.auditLog.push({
+    appendAuditEntry(state, {
       id: `AUD-${state.auditLog.length + 1}`,
       timestamp: updatedAt,
       action: 'Enterprise event ingested',
@@ -302,17 +331,19 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
   async planNextActions(workflowId: WorkflowId): Promise<PlannedAction[]> {
     const state = requireState(this.store, workflowId);
     const analysis = toAnalysis(state);
-    if (analysis.mainBlocker !== 'laptop-allocation') return [];
+    if (!analysis.mainBlocker) return [];
+    const blocker = state.nodes.find((node) => node.id === analysis.mainBlocker);
+    if (!blocker) return [];
 
     return [{
-      id: LAPTOP_RESOLUTION_ACTION_ID,
-      title: 'Complete Laptop Allocation',
-      owner: state.nodes.find((node) => node.id === analysis.mainBlocker)?.owner ?? 'IT Ops',
+      id: `resolve-${blocker.id}`,
+      title: `Complete ${blocker.label}`,
+      owner: blocker.owner || 'Unassigned',
       evidenceIds: analysis.findings
         .filter((finding) => finding.affectedNodeIds.includes(analysis.mainBlocker!))
         .flatMap((finding) => finding.evidenceIds)
         .filter((id, index, ids) => ids.indexOf(id) === index),
-      expectedImpact: 'Completes the root blocker and releases Identity Access and VPN Setup for execution.',
+      expectedImpact: `Completes ${blocker.label}, recalculates deterministic findings, and releases eligible downstream work.`,
       requiresApproval: true,
     }];
   }
@@ -322,49 +353,217 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     actionId: string,
     approvedBy: string,
   ): Promise<ActionExecutionResult> {
-    if (actionId !== LAPTOP_RESOLUTION_ACTION_ID) {
+    if (!actionId.startsWith('resolve-')) {
       throw new Error(`Action "${actionId}" is not executable for this workflow.`);
     }
 
     const state = requireState(this.store, workflowId);
-    const laptop = state.nodes.find((node) => node.id === 'laptop-allocation');
-    if (!laptop) throw new Error('Laptop Allocation node is missing from the workflow.');
+    const nodeId = actionId.slice('resolve-'.length);
+    const targetNode = state.nodes.find((node) => node.id === nodeId);
+    if (!targetNode) throw new Error(`Workflow node "${nodeId}" is missing from the workflow.`);
+    if (targetNode.status === 'completed') throw new Error(`Workflow node "${nodeId}" is already completed.`);
 
     const beforeHealth = analyzeWorkflow(state).health;
     const completedAt = demoNow();
-    laptop.status = 'completed';
-    laptop.completedAt = completedAt;
+    this.store.recordHistory(workflowId, state);
+    targetNode.status = 'completed';
+    targetNode.completedAt = completedAt;
     propagateReadyStatuses(state);
 
     const recalculated = applyAnalysis(state);
-    const auditEntry: DomainAuditEntry = {
+    const auditEntry = appendAuditEntry(recalculated, {
       id: `AUD-${recalculated.auditLog.length + 1}`,
       timestamp: completedAt,
-      action: 'Laptop Allocation completed',
+      action: `${targetNode.label} completed`,
       actor: approvedBy,
       details: {
-        summary: `Approved action completed Laptop Allocation and recalculated workflow health from ${beforeHealth} to ${recalculated.health}.`,
+        summary: `Approved action completed ${targetNode.label} and recalculated workflow health from ${beforeHealth} to ${recalculated.health}.`,
         actionId,
-        nodeId: laptop.id,
+        nodeId: targetNode.id,
         beforeHealth,
         afterHealth: recalculated.health,
       },
-    };
-    recalculated.auditLog.push(auditEntry);
+    });
     this.commit(recalculated, completedAt);
 
     return {
       workflowId,
       actionId,
       approvedBy,
-      summary: `Laptop Allocation completed. Workflow health changed from ${beforeHealth} to ${recalculated.health}.`,
+      summary: `${targetNode.label} completed. Workflow health changed from ${beforeHealth} to ${recalculated.health}.`,
       state: await this.getState(workflowId),
       auditEntry: toAuditEntry(auditEntry),
     };
   }
 
+  async escalateBlocker(workflowId: WorkflowId): Promise<EscalationPayload> {
+    const state = requireState(this.store, workflowId);
+    const analysis = toAnalysis(state);
+    const nodeId = analysis.mainBlocker;
+    if (!nodeId) throw new Error(`Workflow "${workflowId}" has no blocker to escalate.`);
+    const node = state.nodes.find((candidate) => candidate.id === nodeId);
+    if (!node) throw new Error(`Workflow node "${nodeId}" was not found.`);
+    const breachHours = node.sla
+      ? Math.max(0, Math.floor((demoNow().getTime() - node.sla.getTime()) / (60 * 60 * 1000)))
+      : 0;
+    const findings = analysis.findings.filter((finding) => finding.affectedNodeIds.includes(nodeId));
+
+    return {
+      workflowId,
+      nodeId,
+      nodeLabel: node.label,
+      owningTeam: node.owner || 'Unassigned',
+      slaDeadline: node.sla?.toISOString(),
+      breachHours,
+      evidenceIds: [...new Set(findings.flatMap((finding) => finding.evidenceIds))],
+      findingIds: findings.map((finding) => finding.id),
+      summary: `${node.label} is the root blocker owned by ${node.owner || 'an unassigned team'}${breachHours ? ` and is ${breachHours} hours beyond SLA` : ''}.`,
+    };
+  }
+
+  async predictCompletion(workflowId: WorkflowId): Promise<CompletionForecast> {
+    const forecast = predictCompletion(requireState(this.store, workflowId));
+    return {
+      workflowId,
+      estimatedCompletion: toIso(forecast.estimatedCompletion),
+      criticalPath: forecast.criticalPath,
+      delayDrivers: forecast.delayDrivers.map((driver) => ({
+        nodeId: driver.nodeId,
+        reasons: driver.reasons,
+        sla: driver.sla?.toISOString(),
+      })),
+    };
+  }
+
+  async compareWorkflows(workflowIds?: WorkflowId[]): Promise<WorkflowComparison[]> {
+    const ids = workflowIds?.length ? [...new Set(workflowIds)] : this.store.listWorkflowIds();
+    return ids.map((workflowId) => {
+      const state = requireState(this.store, workflowId);
+      const analysis = toAnalysis(state);
+      return {
+        workflowId,
+        subject: state.subject,
+        healthScore: analysis.healthScore,
+        mainBlocker: analysis.mainBlocker,
+        estimatedCompletion: analysis.estimatedCompletion,
+        criticalPath: analysis.criticalPath,
+      };
+    });
+  }
+
+  async rollbackAction(workflowId: WorkflowId, approvedBy: string): Promise<RollbackActionResult> {
+    if (!approvedBy.trim()) throw new Error('An approver is required to roll back an action.');
+    const current = requireState(this.store, workflowId);
+    const retainedAuditLog = current.auditLog;
+    const revertedEntry = retainedAuditLog.at(-1);
+    const restored = this.store.restorePreviousState(workflowId);
+    if (!restored) throw new Error(`Workflow "${workflowId}" has no prior approved action to roll back.`);
+    rehydrateDates(restored);
+    restored.auditLog = retainedAuditLog;
+    const rolledBackAt = demoNow();
+    const recalculated = applyAnalysis(restored);
+    const auditEntry = appendAuditEntry(recalculated, {
+      id: `AUD-${recalculated.auditLog.length + 1}`,
+      timestamp: rolledBackAt,
+      action: 'Approved action rolled back',
+      actor: approvedBy,
+      details: {
+        summary: 'Restored the workflow state before the most recent approved action without removing audit history.',
+        workflowId,
+        revertedAuditEntryId: revertedEntry?.id,
+      },
+    });
+    this.store.setState(recalculated);
+    this.updatedAtByWorkflow.set(workflowId, rolledBackAt);
+
+    return {
+      workflowId,
+      approvedBy,
+      summary: 'Restored the state before the most recent approved action.',
+      state: await this.getState(workflowId),
+      auditEntry: toAuditEntry(auditEntry),
+    };
+  }
+
+  async simulateMultiResolution(
+    workflowId: WorkflowId,
+    nodeIds: string[],
+    resolvedAt: string,
+  ): Promise<MultiSimulationResult> {
+    const state = requireState(this.store, workflowId);
+    const result = simulateMultiResolution(state, nodeIds, new Date(resolvedAt));
+    const after: BlockerAnalysis = {
+      workflowId,
+      findings: result.afterFindings.map(toFinding),
+      evidence: evidenceForFindings(state, result.afterFindings),
+      healthScore: result.afterHealth,
+      healthBreakdown: result.afterFindings
+        .filter((finding) => finding.riskPoints > 0)
+        .map((finding) => ({ label: `${finding.ruleId} (${finding.id})`, riskPoints: finding.riskPoints })),
+      criticalPath: result.criticalPath,
+      estimatedCompletion: toIso(result.completionEstimate),
+    };
+    return {
+      workflowId,
+      resolvedNodeIds: result.resolvedNodeIds,
+      before: toAnalysis(state),
+      after,
+      resolvedFindingIds: result.findingsDelta.resolved.map((finding) => finding.id),
+      introducedFindingIds: result.findingsDelta.introduced.map((finding) => finding.id),
+    };
+  }
+
+  async getOwnerWorkload(ownerId: string, workflowIds?: WorkflowId[]): Promise<OwnerWorkloadResult> {
+    const states = this.store.getStates(workflowIds);
+    for (const state of states) rehydrateDates(state);
+    const workload = getOwnerWorkload(states, ownerId);
+    return workload;
+  }
+
+  async subscribeAlerts(input: Omit<AlertSubscriptionResult, 'id' | 'createdAt'>): Promise<AlertSubscriptionResult> {
+    requireState(this.store, input.workflowId);
+    const subscription = this.alertSubscriptions.add({
+      ...input,
+      id: `SUB-${String(this.nextSubscriptionNumber++).padStart(3, '0')}`,
+      createdAt: demoNow(),
+    });
+    return { ...subscription, createdAt: subscription.createdAt.toISOString() };
+  }
+
+  async exportAuditReport(workflowId: WorkflowId): Promise<AuditReport> {
+    const state = await this.getState(workflowId);
+    const findings = await this.getFindings(workflowId);
+    const auditLog = await this.getAuditLog(workflowId);
+    const integrity = await this.verifyAuditIntegrity(workflowId);
+    const markdown = [
+      `# HandoffOS Audit Report: ${state.employee}`,
+      '',
+      `- Workflow: ${workflowId}`,
+      `- Health: ${state.healthScore}/100`,
+      `- Main blocker: ${state.mainBlocker ?? 'None'}`,
+      `- Estimated completion: ${state.estimatedCompletion}`,
+      '',
+      '## Findings',
+      ...findings.map((finding) => `- ${finding.ruleId} (${finding.confidence}): ${finding.title}`),
+      '',
+      '## Audit Log',
+      ...auditLog.map((entry) => `- ${entry.timestamp} | ${entry.actor} | ${entry.action} | ${entry.details}`),
+      '',
+      '## Integrity',
+      `- Audit chain valid: ${integrity.valid}`,
+      `- Entries checked: ${integrity.checkedEntries}`,
+      ...(integrity.latestHash ? [`- Latest hash: ${integrity.latestHash}`] : []),
+    ].join('\n');
+    return { workflowId, generatedAt: demoNow().toISOString(), state, findings, auditLog, integrity, markdown };
+  }
+
   async getAuditLog(workflowId: WorkflowId): Promise<AuditEntry[]> {
     return requireState(this.store, workflowId).auditLog.map(toAuditEntry);
+  }
+
+  async verifyAuditIntegrity(workflowId: WorkflowId): Promise<AuditIntegrityResult> {
+    const integrity = verifyAuditIntegrity(requireState(this.store, workflowId).auditLog);
+    return { workflowId, ...integrity };
   }
 
   private commit(state: WorkflowState, updatedAt: Date): void {

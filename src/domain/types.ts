@@ -7,6 +7,7 @@ export interface WorkflowNode {
   status: NodeStatus;
   dependencies: string[];
   sla?: Date;
+  ownerResponseSlaHours?: number;
   completedAt?: Date;
   evidenceIds: string[];
 }
@@ -19,6 +20,9 @@ export interface SourceEvent {
   type: string;
   payload: Record<string, unknown>;
   evidenceId: string;
+  nodeId?: string;
+  logicalTaskKey?: string;
+  reportedStatus?: NodeStatus;
 }
 
 export interface Evidence {
@@ -38,6 +42,7 @@ export interface Finding {
   evidenceIds: string[];
   affectedNodeIds: string[];
   riskPoints: number;
+  confidence?: 'strong' | 'weak';
 }
 
 export interface AuditEntry {
@@ -46,6 +51,8 @@ export interface AuditEntry {
   action: string;
   actor: string;
   details: Record<string, unknown>;
+  previousHash?: string | null;
+  hash?: string;
 }
 
 export interface ActionPlan {
@@ -73,6 +80,7 @@ export interface WorkflowState {
   workflowId: string;
   label: string;
   subject: string;
+  targetDate: Date;
   nodes: WorkflowNode[];
   events: SourceEvent[];
   evidence: Evidence[];
@@ -84,12 +92,18 @@ export interface WorkflowState {
   auditLog: AuditEntry[];
 }
 
+export interface OwnerWorkload {
+  ownerId: string;
+  openNodeIds: string[];
+  activeFindingIds: string[];
+}
+
 export interface AlertSubscription {
   id: string;
   workflowId: string;
-  metric: string;
+  metric: 'health' | 'sla_overdue' | 'blocked_nodes';
+  comparator: 'lt' | 'lte' | 'gt' | 'gte';
   threshold: number;
-  comparator: string;
   subscriberId: string;
+  createdAt: Date;
 }
-

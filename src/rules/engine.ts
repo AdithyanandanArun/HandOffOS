@@ -19,6 +19,9 @@ export const RISK_POINTS = {
   criticalPathBlocked: 5,
   approvalStale: 0,
   calendarMissing: 5,
+  duplicateTask: 5,
+  ownerUnresponsive: 8,
+  conflictingStatus: 10,
 } as const;
 
 function findingId(ruleId: string, nodeId: string): string {
@@ -260,14 +263,120 @@ const R007: RuleDefinition = {
   },
 };
 
-export const ALL_RULES: RuleDefinition[] = [R001, R002, R003, R004, R005, R006, R007];
+// R-008: Duplicate Task Detected
+const R008: RuleDefinition = {
+  id: 'R-008',
+  title: 'Duplicate Task Detected',
+  description: 'Independent systems registered the same logical task.',
+  evaluate(state) {
+    const findings: Finding[] = [];
+    const registrations = state.events.filter((event) => event.type === 'task_registered' && event.logicalTaskKey);
+    const byKey = new Map<string, typeof registrations>();
+    for (const event of registrations) {
+      const entries = byKey.get(event.logicalTaskKey!) ?? [];
+      entries.push(event);
+      byKey.set(event.logicalTaskKey!, entries);
+    }
+
+    for (const [logicalTaskKey, events] of byKey) {
+      if (new Set(events.map((event) => event.source)).size < 2) continue;
+      const nodeIds = [...new Set(events.flatMap((event) => event.nodeId ? [event.nodeId] : []))];
+      findings.push({
+        id: findingId('R-008', logicalTaskKey),
+        ruleId: 'R-008',
+        title: `Duplicate Task Detected: ${logicalTaskKey}`,
+        severity: 'medium',
+        explanation: `Multiple independent systems registered the logical task "${logicalTaskKey}".`,
+        evidenceIds: events.map((event) => event.evidenceId),
+        affectedNodeIds: nodeIds,
+        riskPoints: RISK_POINTS.duplicateTask,
+      });
+    }
+    return findings;
+  },
+};
+
+// R-009: Owner Unresponsive
+const R009: RuleDefinition = {
+  id: 'R-009',
+  title: 'Owner Unresponsive',
+  description: 'An assigned owner has not updated a task within its response SLA.',
+  evaluate(state) {
+    const findings: Finding[] = [];
+    const now = demoNow();
+    for (const node of state.nodes) {
+      if (node.status === 'completed' || !node.ownerResponseSlaHours) continue;
+      const nodeEvents = state.events.filter((event) => event.nodeId === node.id);
+      const ownerEvents = nodeEvents.filter((event) => event.actor === node.owner);
+      const latestReference = [...ownerEvents, ...nodeEvents]
+        .sort((left, right) => right.timestamp.getTime() - left.timestamp.getTime())[0]?.timestamp;
+      const reference = latestReference ?? node.sla ?? state.targetDate;
+      const elapsedHours = Math.floor((now.getTime() - reference.getTime()) / (60 * 60 * 1000));
+      if (elapsedHours <= node.ownerResponseSlaHours || ownerEvents.length > 0) continue;
+
+      findings.push({
+        id: findingId('R-009', node.id),
+        ruleId: 'R-009',
+        title: `Owner Unresponsive: ${node.label}`,
+        severity: 'high',
+        explanation: `Owner "${node.owner}" has not provided an update for ${elapsedHours} hours; the response SLA is ${node.ownerResponseSlaHours} hours.`,
+        evidenceIds: nodeEvents.map((event) => event.evidenceId),
+        affectedNodeIds: [node.id],
+        riskPoints: RISK_POINTS.ownerUnresponsive,
+      });
+    }
+    return findings;
+  },
+};
+
+// R-010: Conflicting Status
+const R010: RuleDefinition = {
+  id: 'R-010',
+  title: 'Conflicting Status',
+  description: 'Source systems reported incompatible statuses for the same logical task.',
+  evaluate(state) {
+    const findings: Finding[] = [];
+    const reports = state.events.filter((event) => event.type === 'status_reported' && event.logicalTaskKey && event.reportedStatus);
+    const byKey = new Map<string, typeof reports>();
+    for (const event of reports) {
+      const entries = byKey.get(event.logicalTaskKey!) ?? [];
+      entries.push(event);
+      byKey.set(event.logicalTaskKey!, entries);
+    }
+
+    for (const [logicalTaskKey, events] of byKey) {
+      const statuses = new Set(events.map((event) => event.reportedStatus));
+      const sources = new Set(events.map((event) => event.source));
+      if (statuses.size < 2 || sources.size < 2) continue;
+      findings.push({
+        id: findingId('R-010', logicalTaskKey),
+        ruleId: 'R-010',
+        title: `Conflicting Status: ${logicalTaskKey}`,
+        severity: 'high',
+        explanation: `Independent systems reported incompatible statuses (${[...statuses].join(', ')}) for "${logicalTaskKey}".`,
+        evidenceIds: events.map((event) => event.evidenceId),
+        affectedNodeIds: [...new Set(events.flatMap((event) => event.nodeId ? [event.nodeId] : []))],
+        riskPoints: RISK_POINTS.conflictingStatus,
+      });
+    }
+    return findings;
+  },
+};
+
+export const ALL_RULES: RuleDefinition[] = [R001, R002, R003, R004, R005, R006, R007, R008, R009, R010];
+
+function classifyConfidence(state: WorkflowState, finding: Finding): Finding['confidence'] {
+  const evidence = state.evidence.filter((entry) => finding.evidenceIds.includes(entry.id));
+  if (evidence.some((entry) => entry.type === 'absence')) return 'weak';
+  return evidence.length >= 2 ? 'strong' : 'weak';
+}
 
 export function evaluateAllRules(state: WorkflowState): Finding[] {
   const findings: Finding[] = [];
   for (const rule of ALL_RULES) {
     findings.push(...rule.evaluate(state));
   }
-  return findings;
+  return findings.map((finding) => ({ ...finding, confidence: classifyConfidence(state, finding) }));
 }
 
 export function computeCriticalPath(state: WorkflowState): string[] {
