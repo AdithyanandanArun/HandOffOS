@@ -64,6 +64,17 @@ export interface AuditEntry {
   action: string;
   actor: string;
   details: string;
+  previousHash?: string | null;
+  hash?: string;
+}
+
+export interface AuditIntegrityResult {
+  workflowId: WorkflowId;
+  valid: boolean;
+  checkedEntries: number;
+  latestHash?: string;
+  firstInvalidEntryId?: string;
+  reason?: 'missing_hash' | 'previous_hash_mismatch' | 'entry_hash_mismatch';
 }
 
 export interface BlockerAnalysis {
@@ -152,6 +163,7 @@ export interface AuditReport {
   state: WorkflowStateSnapshot;
   findings: FindingSnapshot[];
   auditLog: AuditEntry[];
+  integrity: AuditIntegrityResult;
   markdown: string;
 }
 
@@ -201,6 +213,7 @@ export interface ActionPort {
 
 export interface AuditPort {
   getAuditLog(workflowId: WorkflowId): Promise<AuditEntry[]>;
+  verifyAuditIntegrity(workflowId: WorkflowId): Promise<AuditIntegrityResult>;
 }
 
 export interface Phase2Port {

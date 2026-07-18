@@ -4,6 +4,7 @@ import type {
   AnalysisPort,
   AlertSubscriptionResult,
   AuditReport,
+  AuditIntegrityResult,
   AuditEntry,
   AuditPort,
   BlockerAnalysis,
@@ -46,6 +47,10 @@ export class HandoffOSApplication {
 
   getAuditLog(workflowId: WorkflowId): Promise<AuditEntry[]> {
     return this.runtime.getAuditLog(workflowId);
+  }
+
+  verifyAuditIntegrity(workflowId: WorkflowId): Promise<AuditIntegrityResult> {
+    return this.runtime.verifyAuditIntegrity(workflowId);
   }
 
   getRules(): Promise<RuleDefinition[]> {

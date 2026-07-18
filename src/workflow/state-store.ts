@@ -4,6 +4,7 @@ export interface WorkflowStateStore {
   getState(workflowId: string): WorkflowState | null;
   getStates(workflowIds?: string[]): WorkflowState[];
   listWorkflowIds(): string[];
+  clear(): void;
   setState(state: WorkflowState): void;
   recordHistory(workflowId: string, state: WorkflowState): void;
   getPreviousState(workflowId: string): WorkflowState | null;
@@ -38,6 +39,11 @@ export class InMemoryWorkflowStateStore implements WorkflowStateStore {
 
   listWorkflowIds(): string[] {
     return [...this.states.keys()].sort();
+  }
+
+  clear(): void {
+    this.states.clear();
+    this.history.clear();
   }
 
   setState(state: WorkflowState): void {

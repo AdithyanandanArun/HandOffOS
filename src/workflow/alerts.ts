@@ -22,4 +22,8 @@ export class AlertSubscriptionStore {
   remove(subscriptionId: string): boolean {
     return this.subscriptions.delete(subscriptionId);
   }
+
+  clear(): void {
+    this.subscriptions.clear();
+  }
 }

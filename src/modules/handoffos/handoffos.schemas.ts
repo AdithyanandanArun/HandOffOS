@@ -57,6 +57,8 @@ export const subscribeAlertsSchema = workflowIdSchema.extend({
 
 export const exportAuditReportSchema = workflowIdSchema;
 
+export const verifyAuditIntegritySchema = workflowIdSchema;
+
 const nodeStatusSchema = z.enum(['completed', 'blocked', 'pending', 'ready', 'in_progress']);
 const severitySchema = z.enum(['low', 'medium', 'high', 'critical']);
 
@@ -223,6 +225,8 @@ const rollbackOutputSchema = z.object({
     action: z.string(),
     actor: z.string(),
     details: z.string(),
+    previousHash: z.string().nullable().optional(),
+    hash: z.string().optional(),
   }),
 });
 
@@ -240,6 +244,15 @@ const alertSubscriptionOutputSchema = z.object({
   threshold: z.number(),
   subscriberId: z.string(),
   createdAt: z.string().datetime(),
+});
+
+const auditIntegrityOutputSchema = z.object({
+  workflowId: z.string(),
+  valid: z.boolean(),
+  checkedEntries: z.number().int().nonnegative(),
+  latestHash: z.string().optional(),
+  firstInvalidEntryId: z.string().optional(),
+  reason: z.enum(['missing_hash', 'previous_hash_mismatch', 'entry_hash_mismatch']).optional(),
 });
 
 export const ingestEventOutputSchema = z.object({
@@ -282,6 +295,8 @@ export const executeActionOutputSchema = z.object({
       action: z.string(),
       actor: z.string(),
       details: z.string(),
+      previousHash: z.string().nullable().optional(),
+      hash: z.string().optional(),
     }),
   }),
 }).merge(dashboardDataOutputSchema);
@@ -334,9 +349,17 @@ export const exportAuditReportOutputSchema = z.object({
       action: z.string(),
       actor: z.string(),
       details: z.string(),
+      previousHash: z.string().nullable().optional(),
+      hash: z.string().optional(),
     })),
+    integrity: auditIntegrityOutputSchema,
     markdown: z.string(),
   }),
+});
+
+export const verifyAuditIntegrityOutputSchema = z.object({
+  summary: z.string(),
+  integrity: auditIntegrityOutputSchema,
 });
 
 export type WorkflowIdInput = z.infer<typeof workflowIdSchema>;
@@ -351,3 +374,4 @@ export type SimulateMultiResolutionInput = z.infer<typeof simulateMultiResolutio
 export type GetOwnerWorkloadInput = z.infer<typeof getOwnerWorkloadSchema>;
 export type SubscribeAlertsInput = z.infer<typeof subscribeAlertsSchema>;
 export type ExportAuditReportInput = z.infer<typeof exportAuditReportSchema>;
+export type VerifyAuditIntegrityInput = z.infer<typeof verifyAuditIntegritySchema>;

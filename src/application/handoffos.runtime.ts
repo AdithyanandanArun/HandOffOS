@@ -14,6 +14,7 @@ import { ALL_RULES } from '../rules/engine.js';
 import { AlertSubscriptionStore } from '../workflow/alerts.js';
 import { createSeedStates } from '../workflow/seed.js';
 import { InMemoryWorkflowStateStore, type WorkflowStateStore } from '../workflow/state-store.js';
+import { appendAuditEntry, verifyAuditIntegrity } from '../workflow/audit.js';
 import { getOwnerWorkload } from '../workflow/workload.js';
 import type {
   ActionExecutionResult,
@@ -22,6 +23,7 @@ import type {
   AlertSubscriptionResult,
   AuditReport,
   AuditEntry,
+  AuditIntegrityResult,
   AuditPort,
   BlockerAnalysis,
   EvidenceReference,
@@ -179,6 +181,8 @@ function toAuditEntry(entry: DomainAuditEntry): AuditEntry {
     details: typeof entry.details.summary === 'string'
       ? entry.details.summary
       : JSON.stringify(entry.details),
+    previousHash: entry.previousHash,
+    hash: entry.hash,
   };
 }
 
@@ -268,7 +272,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     }
 
     const updatedAt = sourceEvent.timestamp;
-    state.auditLog.push({
+    appendAuditEntry(state, {
       id: `AUD-${state.auditLog.length + 1}`,
       timestamp: updatedAt,
       action: 'Enterprise event ingested',
@@ -367,7 +371,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     propagateReadyStatuses(state);
 
     const recalculated = applyAnalysis(state);
-    const auditEntry: DomainAuditEntry = {
+    const auditEntry = appendAuditEntry(recalculated, {
       id: `AUD-${recalculated.auditLog.length + 1}`,
       timestamp: completedAt,
       action: `${targetNode.label} completed`,
@@ -379,8 +383,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
         beforeHealth,
         afterHealth: recalculated.health,
       },
-    };
-    recalculated.auditLog.push(auditEntry);
+    });
     this.commit(recalculated, completedAt);
 
     return {
@@ -450,19 +453,26 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
 
   async rollbackAction(workflowId: WorkflowId, approvedBy: string): Promise<RollbackActionResult> {
     if (!approvedBy.trim()) throw new Error('An approver is required to roll back an action.');
+    const current = requireState(this.store, workflowId);
+    const retainedAuditLog = current.auditLog;
+    const revertedEntry = retainedAuditLog.at(-1);
     const restored = this.store.restorePreviousState(workflowId);
     if (!restored) throw new Error(`Workflow "${workflowId}" has no prior approved action to roll back.`);
     rehydrateDates(restored);
+    restored.auditLog = retainedAuditLog;
     const rolledBackAt = demoNow();
-    const auditEntry: DomainAuditEntry = {
-      id: `AUD-${restored.auditLog.length + 1}`,
+    const recalculated = applyAnalysis(restored);
+    const auditEntry = appendAuditEntry(recalculated, {
+      id: `AUD-${recalculated.auditLog.length + 1}`,
       timestamp: rolledBackAt,
       action: 'Approved action rolled back',
       actor: approvedBy,
-      details: { summary: 'Restored the snapshot before the most recent approved action.', workflowId },
-    };
-    const recalculated = applyAnalysis(restored);
-    recalculated.auditLog.push(auditEntry);
+      details: {
+        summary: 'Restored the workflow state before the most recent approved action without removing audit history.',
+        workflowId,
+        revertedAuditEntryId: revertedEntry?.id,
+      },
+    });
     this.store.setState(recalculated);
     this.updatedAtByWorkflow.set(workflowId, rolledBackAt);
 
@@ -524,6 +534,7 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
     const state = await this.getState(workflowId);
     const findings = await this.getFindings(workflowId);
     const auditLog = await this.getAuditLog(workflowId);
+    const integrity = await this.verifyAuditIntegrity(workflowId);
     const markdown = [
       `# HandoffOS Audit Report: ${state.employee}`,
       '',
@@ -537,12 +548,22 @@ export class HandoffOSRuntime implements WorkflowPort, AnalysisPort, ActionPort,
       '',
       '## Audit Log',
       ...auditLog.map((entry) => `- ${entry.timestamp} | ${entry.actor} | ${entry.action} | ${entry.details}`),
+      '',
+      '## Integrity',
+      `- Audit chain valid: ${integrity.valid}`,
+      `- Entries checked: ${integrity.checkedEntries}`,
+      ...(integrity.latestHash ? [`- Latest hash: ${integrity.latestHash}`] : []),
     ].join('\n');
-    return { workflowId, generatedAt: demoNow().toISOString(), state, findings, auditLog, markdown };
+    return { workflowId, generatedAt: demoNow().toISOString(), state, findings, auditLog, integrity, markdown };
   }
 
   async getAuditLog(workflowId: WorkflowId): Promise<AuditEntry[]> {
     return requireState(this.store, workflowId).auditLog.map(toAuditEntry);
+  }
+
+  async verifyAuditIntegrity(workflowId: WorkflowId): Promise<AuditIntegrityResult> {
+    const integrity = verifyAuditIntegrity(requireState(this.store, workflowId).auditLog);
+    return { workflowId, ...integrity };
   }
 
   private commit(state: WorkflowState, updatedAt: Date): void {

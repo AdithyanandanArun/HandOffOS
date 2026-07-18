@@ -56,6 +56,9 @@ test('Phase 2 MCP tool handlers return their advanced structured payloads', asyn
   const report = await tools.exportAuditReport({ workflowId: 'onboard-priya' }, context);
   assert.match(report.report.markdown, /HandoffOS Audit Report/);
 
+  const emptyIntegrity = await tools.verifyAuditIntegrity({ workflowId: 'onboard-priya' }, context);
+  assert.equal(emptyIntegrity.integrity.valid, true);
+
   const actions = await tools.planNextActions({ workflowId: 'onboard-priya' }, context);
   await tools.executeAction({
     workflowId: 'onboard-priya',
@@ -64,6 +67,8 @@ test('Phase 2 MCP tool handlers return their advanced structured payloads', asyn
   }, context);
   const rollback = await tools.rollbackAction({ workflowId: 'onboard-priya', approvedBy: 'IT Director' }, context);
   assert.equal(rollback.rollback.state.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'blocked');
+  const integrity = await tools.verifyAuditIntegrity({ workflowId: 'onboard-priya' }, context);
+  assert.equal(integrity.integrity.checkedEntries, 2);
 });
 
 test('Phase 2 MCP prompts require evidence-grounded responses', async () => {

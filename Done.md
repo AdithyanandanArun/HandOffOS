@@ -4,6 +4,7 @@ This is the append-only team tracker. Every repository change must add a dated e
 
 ## Completed
 
+- 2026-07-18 | Ad | Added a per-workflow SHA-256 audit chain, integrity verification MCP tool, audit-report integrity status, and rollback behavior that retains the original action audit record before appending a reversal record. | Files: `src/domain/types.ts`, `src/workflow/audit.ts`, `src/application/**`, `src/modules/handoffos/**`, `tests/phase2.*.test.mjs` | Verification: `npm test` passed all 11 tests; `graphify update .` passed. | Commit: pending.
 - 2026-07-18 | Ad | Removed the obsolete individual ownership and Phase 2 planning documents after consolidating the work into the implemented product and shared documentation. | Files: `Ad.md`, `Am.md`, `G.md`, `Y.md`, `AdPhase2.md`, `AmPhase2.md`, `GPhase2.md`, `YPhase2.md` | Verification: core product, demo, implementation, and progress documentation retained. | Commit: pending.
 
 - 2026-07-17 | Ad | Repository initialized on `main`, basic README created, remote repository configured, and initial history reset to use AdithyanandanArun as author and committer. | Verified with Git history and remote push.

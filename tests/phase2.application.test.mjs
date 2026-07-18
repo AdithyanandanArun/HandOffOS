@@ -68,6 +68,10 @@ test('Phase 2 rollback is approval-gated and multi-simulation does not mutate li
   );
   const rollback = await app.rollbackAction('onboard-priya', 'IT Director');
   assert.equal(rollback.state.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'blocked');
+  const integrity = await app.verifyAuditIntegrity('onboard-priya');
+  assert.equal(integrity.valid, true);
+  assert.equal(integrity.checkedEntries, 2);
+  assert.equal((await app.getAuditLog('onboard-priya')).length, 2);
 
   const simulation = await app.simulateMultiResolution(
     'onboard-priya',

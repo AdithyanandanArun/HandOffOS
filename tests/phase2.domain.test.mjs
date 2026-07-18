@@ -5,6 +5,7 @@ import { createSeedStates } from '../dist/workflow/seed.js';
 import { AlertSubscriptionStore } from '../dist/workflow/alerts.js';
 import { InMemoryWorkflowStateStore } from '../dist/workflow/state-store.js';
 import { getOwnerWorkload } from '../dist/workflow/workload.js';
+import { appendAuditEntry, verifyAuditIntegrity } from '../dist/workflow/audit.js';
 
 test('seeds independent onboarding and vendor workflows with deterministic rule evidence', () => {
   const states = createSeedStates();
@@ -49,4 +50,29 @@ test('owner workload and alert subscriptions remain isolated from workflow state
   assert.equal(subscriptions.list('onboard-priya').length, 1);
   assert.equal(subscriptions.remove('SUB-001'), true);
   assert.equal(subscriptions.list().length, 0);
+});
+
+test('audit records form a tamper-evident chain', () => {
+  const [priya] = createSeedStates();
+  appendAuditEntry(priya, {
+    id: 'AUD-001',
+    timestamp: new Date('2025-01-10T09:00:00Z'),
+    action: 'First action',
+    actor: 'it-director',
+    details: { summary: 'First controlled change.' },
+  });
+  appendAuditEntry(priya, {
+    id: 'AUD-002',
+    timestamp: new Date('2025-01-10T10:00:00Z'),
+    action: 'Second action',
+    actor: 'it-director',
+    details: { summary: 'Second controlled change.' },
+  });
+
+  assert.equal(verifyAuditIntegrity(priya.auditLog).valid, true);
+  priya.auditLog[0].details.summary = 'Modified after the fact.';
+  const tampered = verifyAuditIntegrity(priya.auditLog);
+  assert.equal(tampered.valid, false);
+  assert.equal(tampered.firstInvalidEntryId, 'AUD-001');
+  assert.equal(tampered.reason, 'entry_hash_mismatch');
 });

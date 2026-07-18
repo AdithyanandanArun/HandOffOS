@@ -51,6 +51,8 @@ export interface AuditEntry {
   action: string;
   actor: string;
   details: Record<string, unknown>;
+  previousHash?: string | null;
+  hash?: string;
 }
 
 export interface ActionPlan {

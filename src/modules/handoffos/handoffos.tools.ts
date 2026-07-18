@@ -26,6 +26,8 @@ import {
   simulateMultiResolutionSchema,
   subscribeAlertsOutputSchema,
   subscribeAlertsSchema,
+  verifyAuditIntegrityOutputSchema,
+  verifyAuditIntegritySchema,
   workflowIdSchema,
   type CompareWorkflowsInput,
   type EscalateBlockerInput,
@@ -38,6 +40,7 @@ import {
   type SimulateResolutionInput,
   type SimulateMultiResolutionInput,
   type SubscribeAlertsInput,
+  type VerifyAuditIntegrityInput,
   type WorkflowIdInput,
 } from './handoffos.schemas.js';
 
@@ -348,6 +351,24 @@ export class HandoffOSTools {
     return {
       summary: `Exported audit report for ${workflowId} with ${report.findings.length} active findings and ${report.auditLog.length} audit entries.`,
       report,
+    };
+  }
+
+  @Tool({
+    name: 'verify_audit_integrity',
+    description: 'Verify the tamper-evident SHA-256 audit chain for a workflow.',
+    inputSchema: verifyAuditIntegritySchema,
+    outputSchema: verifyAuditIntegrityOutputSchema,
+  })
+  async verifyAuditIntegrity(input: VerifyAuditIntegrityInput, context: ExecutionContext) {
+    const workflowId = resolveWorkflowId(input);
+    context.logger.info('Verifying workflow audit integrity', { workflowId });
+    const integrity = await this.application.verifyAuditIntegrity(workflowId);
+    return {
+      summary: integrity.valid
+        ? `Audit chain is valid across ${integrity.checkedEntries} entries.`
+        : `Audit chain validation failed at ${integrity.firstInvalidEntryId ?? 'an unknown entry'} (${integrity.reason ?? 'unknown reason'}).`,
+      integrity,
     };
   }
 }
