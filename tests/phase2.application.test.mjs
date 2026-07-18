@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createHandoffOSApplication } from '../dist/application/handoffos.application.js';
+
+// NitroStack starts a maintenance interval when decorators load. It is irrelevant
+// to these in-memory tests, so do not let it keep the test worker alive.
+const nativeSetInterval = globalThis.setInterval;
+globalThis.setInterval = (...args) => {
+  const timer = nativeSetInterval(...args);
+  timer.unref?.();
+  return timer;
+};
+
+const { createHandoffOSApplication } = await import('../dist/application/handoffos.application.js');
 
 test('Phase 2 application returns deterministic operational query results', async () => {
   const app = createHandoffOSApplication();
