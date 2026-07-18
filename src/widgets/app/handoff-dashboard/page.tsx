@@ -29,6 +29,7 @@ type FindingItem = {
   affectedNodes: string[];
   evidenceIds: string[];
   riskPoints: number;
+  confidence?: 'strong' | 'weak';
 };
 
 type SimulationSnapshot = {
@@ -51,6 +52,45 @@ type PlannedAction = {
   tool: 'plan_next_actions' | 'simulate_resolution' | 'execute_action';
   input: Record<string, unknown>;
   approvalRequired: boolean;
+};
+
+type Escalation = {
+  nodeLabel: string;
+  owningTeam: string;
+  slaDeadline?: string;
+  breachHours: number;
+  evidenceIds: string[];
+  summary: string;
+};
+
+type Forecast = {
+  estimatedCompletion: string;
+  criticalPath: string[];
+  delayDrivers: Array<{ nodeId: string; reasons: string[]; sla?: string }>;
+};
+
+type WorkflowComparison = {
+  workflowId: string;
+  subject: string;
+  healthScore: number;
+  mainBlocker?: string;
+  estimatedCompletion: string;
+  criticalPath: string[];
+};
+
+type OwnerWorkload = {
+  ownerId: string;
+  openNodeIds: string[];
+  activeFindingIds: string[];
+};
+
+type Rollback = {
+  approvedBy: string;
+  summary: string;
+};
+
+type MultiSimulation = {
+  resolvedNodeIds: string[];
 };
 
 type WidgetDashboardData = {
@@ -80,6 +120,15 @@ type WidgetDashboardData = {
   };
   actions: PlannedAction[];
   auditLog: AuditEntry[];
+  advanced: {
+    escalation?: Escalation;
+    forecast?: Forecast;
+    comparisons: WorkflowComparison[];
+    workload?: OwnerWorkload;
+    rollback?: Rollback;
+    multiSimulation?: MultiSimulation;
+    executiveDigest?: string;
+  };
 };
 
 type ToolOutputLike = Partial<WidgetDashboardData> & {
@@ -90,6 +139,13 @@ type ToolOutputLike = Partial<WidgetDashboardData> & {
   actions?: unknown;
   auditLog?: unknown;
   simulation?: unknown;
+  escalation?: unknown;
+  forecast?: unknown;
+  comparisons?: unknown;
+  workload?: unknown;
+  rollback?: unknown;
+  multiSimulation?: unknown;
+  executiveDigest?: unknown;
 };
 
 type HostToolInvoker = {
@@ -230,6 +286,9 @@ const fallbackData: WidgetDashboardData = {
       detail: 'Verification cleared for onboarding workflow.',
     },
   ],
+  advanced: {
+    comparisons: [],
+  },
 };
 
 const statusColorMap: Record<StationStatus, { solid: string; soft: string; glow: string; label: string }> = {
@@ -242,6 +301,10 @@ const statusColorMap: Record<StationStatus, { solid: string; soft: string; glow:
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
+}
+
+function asObject<T>(value: unknown): T | undefined {
+  return value && typeof value === 'object' ? value as T : undefined;
 }
 
 function normalizeDashboardData(raw: ToolOutputLike | undefined): WidgetDashboardData {
@@ -279,6 +342,15 @@ function normalizeDashboardData(raw: ToolOutputLike | undefined): WidgetDashboar
     simulation: simulation && typeof simulation === 'object' ? simulation : fallbackData.simulation,
     actions: actions.length > 0 ? actions : fallbackData.actions,
     auditLog: auditLog.length > 0 ? auditLog : fallbackData.auditLog,
+    advanced: {
+      escalation: asObject<Escalation>(raw.escalation),
+      forecast: asObject<Forecast>(raw.forecast),
+      comparisons: asArray<WorkflowComparison>(raw.comparisons),
+      workload: asObject<OwnerWorkload>(raw.workload),
+      rollback: asObject<Rollback>(raw.rollback),
+      multiSimulation: asObject<MultiSimulation>(raw.multiSimulation),
+      executiveDigest: typeof raw.executiveDigest === 'string' ? raw.executiveDigest : undefined,
+    },
   };
 }
 
@@ -401,6 +473,33 @@ export default function HandoffDashboardWidget() {
             </div>
           </div>
 
+          {data.advanced.escalation ? (
+            <section style={{
+              alignItems: 'center',
+              background: isDark ? 'rgba(120, 37, 28, 0.34)' : 'rgba(255, 229, 220, 0.92)',
+              borderBottom: `1px solid ${isDark ? 'rgba(255, 130, 103, 0.34)' : 'rgba(192, 60, 43, 0.26)'}`,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 16,
+              justifyContent: 'space-between',
+              padding: '16px 22px',
+            }}>
+              <div>
+                <p style={{ color: statusColorMap.blocked.solid, fontSize: 12, fontWeight: 800, letterSpacing: '0.13em', margin: 0, textTransform: 'uppercase' }}>Escalation required</p>
+                <strong style={{ display: 'block', fontSize: 19, marginTop: 6 }}>{data.advanced.escalation.nodeLabel} is owned by {data.advanced.escalation.owningTeam}</strong>
+                <p style={{ fontSize: 14, lineHeight: 1.5, margin: '6px 0 0', opacity: 0.84 }}>{data.advanced.escalation.summary}</p>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                <span style={{ background: statusColorMap.blocked.soft, borderRadius: 999, fontSize: 13, fontWeight: 700, padding: '8px 11px' }}>
+                  {data.advanced.escalation.breachHours > 0 ? `${data.advanced.escalation.breachHours}h overdue` : 'SLA tracked'}
+                </span>
+                <span style={{ background: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(19, 37, 56, 0.08)', borderRadius: 999, fontFamily: '"IBM Plex Mono", monospace', fontSize: 12, padding: '8px 11px' }}>
+                  Evidence: {data.advanced.escalation.evidenceIds.join(', ') || 'none'}
+                </span>
+              </div>
+            </section>
+          ) : null}
+
           <div style={{
             display: 'grid',
             gap: 18,
@@ -411,6 +510,32 @@ export default function HandoffDashboardWidget() {
             <MetricCard label="Completion ETA" value={data.estimatedCompletion} note="Live estimate from the seeded workflow state." isDark={isDark} />
             <MetricCard label="Critical Path" value={data.criticalPath[0] ?? 'None'} note={data.criticalPath.slice(1).join(' -> ') || 'No downstream blockers remain.'} isDark={isDark} />
           </div>
+
+          {data.advanced.forecast ? (
+            <section style={{ margin: '0 22px 22px' }}>
+              <div style={{
+                background: isDark ? 'linear-gradient(110deg, rgba(21, 74, 86, 0.58), rgba(12, 21, 32, 0.84))' : 'linear-gradient(110deg, rgba(214, 242, 239, 0.95), rgba(255, 255, 255, 0.88))',
+                border: `1px solid ${isDark ? 'rgba(97, 211, 200, 0.28)' : 'rgba(33, 126, 118, 0.2)'}`,
+                borderRadius: 22,
+                padding: 18,
+              }}>
+                <div style={{ alignItems: 'baseline', display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' }}>
+                  <div>
+                    <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', margin: 0, textTransform: 'uppercase' }}>Deterministic forecast</p>
+                    <h2 style={{ fontSize: 22, margin: '8px 0 0' }}>Completion projected for {data.advanced.forecast.estimatedCompletion}</h2>
+                  </div>
+                  <span style={{ fontSize: 13, opacity: 0.78 }}>Critical path: {data.advanced.forecast.criticalPath.join(' -> ') || 'None'}</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
+                  {data.advanced.forecast.delayDrivers.map((driver) => (
+                    <span key={driver.nodeId} style={{ background: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(19, 37, 56, 0.07)', borderRadius: 12, fontSize: 13, padding: '9px 11px' }}>
+                      <strong>{driver.nodeId}</strong>: {driver.reasons.join(', ')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           <div style={{
             display: 'grid',
@@ -528,6 +653,74 @@ export default function HandoffDashboardWidget() {
             </section>
           </div>
 
+          {(data.advanced.comparisons.length > 0 || data.advanced.workload || data.advanced.executiveDigest) ? (
+            <div style={{
+              display: 'grid',
+              gap: 20,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              padding: '0 22px 22px',
+            }}>
+              {data.advanced.comparisons.length > 0 ? (
+                <section style={{
+                  background: isDark ? 'rgba(12, 21, 32, 0.78)' : 'rgba(255, 255, 255, 0.88)',
+                  border: `1px solid ${isDark ? 'rgba(136, 168, 199, 0.24)' : 'rgba(46, 74, 104, 0.16)'}`,
+                  borderRadius: 24,
+                  padding: 20,
+                }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', margin: 0, textTransform: 'uppercase' }}>Portfolio view</p>
+                  <h2 style={{ fontSize: 22, margin: '10px 0 14px' }}>Workflow comparison</h2>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {data.advanced.comparisons.map((workflow) => (
+                      <article key={workflow.workflowId} style={{ background: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(18, 37, 56, 0.04)', borderRadius: 16, padding: 13 }}>
+                        <div style={{ alignItems: 'center', display: 'flex', gap: 10, justifyContent: 'space-between' }}>
+                          <strong>{workflow.subject}</strong>
+                          <span style={{ color: workflow.healthScore < 70 ? statusColorMap.blocked.solid : statusColorMap.completed.solid, fontWeight: 800 }}>{workflow.healthScore}/100</span>
+                        </div>
+                        <p style={{ fontSize: 13, lineHeight: 1.5, margin: '8px 0 0', opacity: 0.8 }}>Blocker: {workflow.mainBlocker ?? 'None'} | ETA: {workflow.estimatedCompletion}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {data.advanced.workload ? (
+                <section style={{
+                  background: isDark ? 'rgba(12, 21, 32, 0.78)' : 'rgba(255, 255, 255, 0.88)',
+                  border: `1px solid ${isDark ? 'rgba(136, 168, 199, 0.24)' : 'rgba(46, 74, 104, 0.16)'}`,
+                  borderRadius: 24,
+                  padding: 20,
+                }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', margin: 0, textTransform: 'uppercase' }}>Owner workload</p>
+                  <h2 style={{ fontSize: 22, margin: '10px 0 14px' }}>{data.advanced.workload.ownerId}</h2>
+                  <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                    <div style={{ background: statusColorMap.ready.soft, borderRadius: 16, padding: 14 }}>
+                      <strong style={{ fontSize: 26 }}>{data.advanced.workload.openNodeIds.length}</strong>
+                      <p style={{ fontSize: 13, margin: '6px 0 0', opacity: 0.8 }}>open nodes</p>
+                    </div>
+                    <div style={{ background: statusColorMap.blocked.soft, borderRadius: 16, padding: 14 }}>
+                      <strong style={{ fontSize: 26 }}>{data.advanced.workload.activeFindingIds.length}</strong>
+                      <p style={{ fontSize: 13, margin: '6px 0 0', opacity: 0.8 }}>active findings</p>
+                    </div>
+                  </div>
+                  <p style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: 12, lineHeight: 1.5, margin: '12px 0 0', opacity: 0.74 }}>Nodes: {data.advanced.workload.openNodeIds.join(', ') || 'None'}</p>
+                </section>
+              ) : null}
+
+              {data.advanced.executiveDigest ? (
+                <section style={{
+                  background: isDark ? 'rgba(21, 36, 54, 0.86)' : 'rgba(234, 242, 252, 0.94)',
+                  border: `1px solid ${isDark ? 'rgba(112, 166, 223, 0.3)' : 'rgba(38, 100, 160, 0.2)'}`,
+                  borderRadius: 24,
+                  padding: 20,
+                }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', margin: 0, textTransform: 'uppercase' }}>Executive digest</p>
+                  <h2 style={{ fontSize: 22, margin: '10px 0 10px' }}>Leadership-ready summary</h2>
+                  <p style={{ fontSize: 15, lineHeight: 1.65, margin: 0 }}>{data.advanced.executiveDigest}</p>
+                </section>
+              ) : null}
+            </div>
+          ) : null}
+
           <div style={{
             display: 'grid',
             gap: 20,
@@ -577,9 +770,24 @@ export default function HandoffDashboardWidget() {
                   }}>
                     <div style={{ alignItems: 'center', display: 'flex', gap: 8, justifyContent: 'space-between' }}>
                       <strong>{finding.ruleId}</strong>
-                      <span style={{ color: finding.severity === 'high' ? statusColorMap.blocked.solid : statusColorMap.ready.solid, fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
-                        {finding.severity}
-                      </span>
+                      <div style={{ alignItems: 'center', display: 'flex', gap: 8 }}>
+                        {finding.confidence ? (
+                          <span style={{
+                            background: finding.confidence === 'strong' ? statusColorMap.completed.soft : statusColorMap.ready.soft,
+                            borderRadius: 999,
+                            color: finding.confidence === 'strong' ? statusColorMap.completed.solid : statusColorMap.ready.solid,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            padding: '4px 7px',
+                            textTransform: 'uppercase',
+                          }}>
+                            {finding.confidence} evidence
+                          </span>
+                        ) : null}
+                        <span style={{ color: finding.severity === 'high' ? statusColorMap.blocked.solid : statusColorMap.ready.solid, fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
+                          {finding.severity}
+                        </span>
+                      </div>
                     </div>
                     <p style={{ fontSize: 14, lineHeight: 1.55, margin: '8px 0 10px', opacity: 0.82 }}>{finding.title}</p>
                     <p style={{ fontSize: 13, lineHeight: 1.5, margin: 0, opacity: 0.72 }}>
@@ -616,7 +824,7 @@ export default function HandoffDashboardWidget() {
                   </p>
                 </div>
                 <div style={{ background: statusColorMap.completed.soft, borderRadius: 18, padding: 14 }}>
-                  <strong>Projected after resolution</strong>
+                  <strong>{data.advanced.multiSimulation ? `Projected after ${data.advanced.multiSimulation.resolvedNodeIds.length}-node resolution` : 'Projected after resolution'}</strong>
                   <p style={{ fontSize: 14, lineHeight: 1.55, margin: '8px 0 0', opacity: 0.82 }}>
                     Health {data.simulation.after.health} | ETA {data.simulation.after.estimatedCompletion}
                   </p>
@@ -627,6 +835,17 @@ export default function HandoffDashboardWidget() {
                 <p style={{ fontSize: 13, lineHeight: 1.5, margin: 0, opacity: 0.76 }}>
                   Resolved rules: {data.simulation.resolvedRuleIds.join(', ') || 'None'} | Introduced rules: {data.simulation.introducedRuleIds.join(', ') || 'None'}
                 </p>
+                {data.advanced.multiSimulation ? (
+                  <p style={{ fontFamily: '"IBM Plex Mono", monospace', fontSize: 12, lineHeight: 1.5, margin: 0, opacity: 0.72 }}>
+                    Resolved stations: {data.advanced.multiSimulation.resolvedNodeIds.join(', ')}
+                  </p>
+                ) : null}
+                {data.advanced.rollback ? (
+                  <div style={{ background: isDark ? 'rgba(217, 138, 25, 0.13)' : 'rgba(255, 239, 201, 0.8)', borderRadius: 14, padding: 12 }}>
+                    <strong style={{ fontSize: 13 }}>Rollback recorded</strong>
+                    <p style={{ fontSize: 13, lineHeight: 1.5, margin: '6px 0 0', opacity: 0.8 }}>{data.advanced.rollback.summary} Approved by {data.advanced.rollback.approvedBy}.</p>
+                  </div>
+                ) : null}
               </div>
             </section>
 

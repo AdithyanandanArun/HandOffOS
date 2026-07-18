@@ -4,7 +4,7 @@
     {
       "uri": "/handoff-dashboard",
       "name": "HandoffOS Transit Dashboard",
-      "description": "Transit-map workflow dashboard for blocker detection, simulation, and approved execution.",
+      "description": "Transit-map workflow dashboard for blockers, escalations, forecasts, multi-simulations, rollback, workload, and portfolio comparison.",
       "examples": [
         {
           "name": "Priya blocker detection",
@@ -16,9 +16,18 @@
             "health": 62,
             "estimatedCompletion": "2026-07-22 17:00 IST"
           }
+        },
+        {
+          "name": "Portfolio comparison",
+          "description": "Side-by-side health and forecast context for multiple active workflows.",
+          "data": {
+            "workflowId": "onboard-priya",
+            "liveTool": "compare_workflows",
+            "comparisons": ["onboard-priya", "vendor-onboarding"]
+          }
         }
       ],
-      "tags": ["handoffos", "workflow", "transit-map", "blockers"]
+      "tags": ["handoffos", "workflow", "transit-map", "blockers", "forecast", "escalation"]
     },
     {
       "uri": "/handoffos-status",
