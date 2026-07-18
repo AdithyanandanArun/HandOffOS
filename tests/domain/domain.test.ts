@@ -12,7 +12,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createSeedState, createVendorSeedState } from '../../src/workflow/seed.js';
+import { createSeedState, createVendorOnboardingState } from '../../src/workflow/seed.js';
 import { InMemoryWorkflowStateStore, InMemoryAlertSubscriptionStore } from '../../src/workflow/state-store.js';
 import {
   areDependenciesComplete,
@@ -410,16 +410,16 @@ describe('Event Ingestion', () => {
 
 describe('Phase 2 G-domain Features', () => {
   it('seeds vendor-onboarding workflow with correct details', () => {
-    const state = createVendorSeedState();
+    const state = createVendorOnboardingState();
     assert.equal(state.workflowId, 'vendor-onboarding');
-    assert.equal(state.subject, 'Global Corp');
+    assert.equal(state.subject, 'Acme Analytics');
     assert.ok(state.nodes.some(n => n.id === 'security-review'));
   });
 
   it('listWorkflowIds and getStates support multi-workflow tracking', () => {
     const store = new InMemoryWorkflowStateStore();
     store.setState(fresh());
-    store.setState(createVendorSeedState());
+    store.setState(createVendorOnboardingState());
 
     const ids = store.listWorkflowIds();
     assert.ok(ids.includes('onboard-priya'));
@@ -431,12 +431,14 @@ describe('Phase 2 G-domain Features', () => {
     assert.ok(states.some(s => s.workflowId === 'vendor-onboarding'));
   });
 
-  it('tracks rollback state history correctly for state-changing actions', () => {
+  it('tracks rollback state history when the runtime records a pre-action snapshot', () => {
     const store = new InMemoryWorkflowStateStore();
     const state1 = fresh();
     store.setState(state1);
 
-    // Modify state and add state-changing audit entry
+    store.recordHistory('onboard-priya', state1);
+
+    // Modify state and add the action audit entry.
     const state2 = JSON.parse(JSON.stringify(state1)) as WorkflowState;
     state2.nodes[0].status = 'in_progress';
     state2.auditLog.push({
@@ -454,10 +456,14 @@ describe('Phase 2 G-domain Features', () => {
     assert.equal(prev!.nodes[0].status, 'completed');
 
     const prev2 = store.getPreviousState('onboard-priya');
-    assert.equal(prev2, null);
+    assert.equal(prev2!.nodes[0].status, 'completed');
+
+    const restored = store.restorePreviousState('onboard-priya');
+    assert.equal(restored!.nodes[0].status, 'completed');
+    assert.equal(store.getPreviousState('onboard-priya'), null);
   });
 
-  it('does not track history for non-state-changing actions like event ingestion', () => {
+  it('does not infer rollback history from audit text', () => {
     const store = new InMemoryWorkflowStateStore();
     const state1 = fresh();
     store.setState(state1);
@@ -473,21 +479,19 @@ describe('Phase 2 G-domain Features', () => {
 
     store.setState(state2);
 
-    const prev = store.getPreviousState('onboard-priya');
-    assert.equal(prev, null);
+    assert.equal(store.getPreviousState('onboard-priya'), null);
   });
 
   it('aggregates workload across multiple workflows correctly', () => {
     const store = new InMemoryWorkflowStateStore();
     const priya = fresh();
-    const vendor = createVendorSeedState();
+    const vendor = createVendorOnboardingState();
     
     priya.nodes.find(n => n.id === 'laptop-allocation')!.owner = 'IT Ops';
     priya.nodes.find(n => n.id === 'orientation')!.owner = 'IT Ops';
     
-    vendor.nodes.find(n => n.id === 'account-setup')!.owner = 'IT Ops';
-    vendor.nodes.find(n => n.id === 'system-access')!.owner = 'IT Ops';
-    vendor.nodes.find(n => n.id === 'contract-signature')!.owner = 'IT Ops';
+    vendor.nodes.find(n => n.id === 'security-review')!.owner = 'IT Ops';
+    vendor.nodes.find(n => n.id === 'vendor-activation')!.owner = 'IT Ops';
 
     priya.findings = [
       {
@@ -510,7 +514,7 @@ describe('Phase 2 G-domain Features', () => {
         severity: 'high',
         explanation: 'Vendor blocker',
         evidenceIds: [],
-        affectedNodeIds: ['account-setup'],
+        affectedNodeIds: ['security-review'],
         riskPoints: 10,
       }
     ];
@@ -530,8 +534,9 @@ describe('Phase 2 G-domain Features', () => {
       workflowId: 'onboard-priya',
       metric: 'health',
       threshold: 90,
-      comparator: 'less_than',
+      comparator: 'lt',
       subscriberId: 'user-1',
+      createdAt: demoNow(),
     };
 
     store.addSubscription(sub);

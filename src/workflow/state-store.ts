@@ -14,10 +14,6 @@ export interface WorkflowStateStore {
   addEvidence(workflowId: string, evidence: Evidence): void;
   addAuditEntry(workflowId: string, entry: AuditEntry): void;
   updateNode(workflowId: string, nodeId: string, updates: Partial<WorkflowNode>): void;
-  // Phase 2 additions
-  getPreviousState(workflowId: string): WorkflowState | null;
-  listWorkflowIds(): string[];
-  getStates(workflowIds: string[]): WorkflowState[];
 }
 
 function deepClone<T>(obj: T): T {
@@ -51,19 +47,6 @@ export class InMemoryWorkflowStateStore implements WorkflowStateStore {
   }
 
   setState(state: WorkflowState): void {
-    const oldState = this.states.get(state.workflowId);
-    if (oldState) {
-      const lastAudit = state.auditLog[state.auditLog.length - 1];
-      const isStateChangingAction = lastAudit && 
-        lastAudit.action !== 'Enterprise event ingested';
-
-      if (isStateChangingAction) {
-        if (!this.history.has(state.workflowId)) {
-          this.history.set(state.workflowId, []);
-        }
-        this.history.get(state.workflowId)!.push(deepClone(oldState));
-      }
-    }
     this.states.set(state.workflowId, deepClone(state));
   }
 
@@ -117,23 +100,6 @@ export class InMemoryWorkflowStateStore implements WorkflowStateStore {
     if (node) Object.assign(node, updates);
   }
 
-  // Phase 2 additions
-  getPreviousState(workflowId: string): WorkflowState | null {
-    const historyList = this.history.get(workflowId);
-    if (!historyList || historyList.length === 0) return null;
-    const prevState = historyList.pop()!;
-    return deepClone(prevState);
-  }
-
-  listWorkflowIds(): string[] {
-    return Array.from(this.states.keys());
-  }
-
-  getStates(workflowIds: string[]): WorkflowState[] {
-    return workflowIds
-      .map(id => this.getState(id))
-      .filter((s): s is WorkflowState => s !== null);
-  }
 }
 
 export interface AlertSubscriptionStore {
@@ -157,4 +123,3 @@ export class InMemoryAlertSubscriptionStore implements AlertSubscriptionStore {
     this.subscriptions.delete(id);
   }
 }
-

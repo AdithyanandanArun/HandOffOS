@@ -1,5 +1,6 @@
 import type {
   ActionExecutionResult,
+  AuthorizationContext,
   AuditEntry,
   BlockerAnalysis,
   PlannedAction,
@@ -34,6 +35,7 @@ export interface HandoffDashboardData {
     }>;
   };
   liveTool: string;
+  authorization?: AuthorizationContext;
   mainBlocker: {
     stationId: string;
     title: string;
@@ -103,7 +105,7 @@ function actionsFor(
       id: action.id,
       label: action.title,
       tool: 'execute_action',
-      input: { workflowId, actionId: action.id, approvedBy: '' },
+      input: { workflowId, actionId: action.id, principalId: 'it-director' },
       approvalRequired: action.requiresApproval,
     }));
   }
@@ -121,6 +123,7 @@ export function createDashboardData(input: {
   plannedActions?: PlannedAction[];
   auditLog?: AuditEntry[];
   execution?: ActionExecutionResult;
+  authorization?: AuthorizationContext;
 }): HandoffDashboardData {
   const { state, analysis } = input;
   const nodeById = new Map(state.nodes.map((node) => [node.id, node]));
@@ -149,6 +152,7 @@ export function createDashboardData(input: {
       })),
     },
     liveTool: input.liveTool,
+    authorization: input.authorization,
     mainBlocker: {
       stationId: blocker?.id ?? 'none',
       title: blocker?.label ?? 'No active blocker',

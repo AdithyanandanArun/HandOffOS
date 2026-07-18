@@ -1,5 +1,6 @@
 import type {
   ActionExecutionResult,
+  AuthorizationContext,
   ActionPort,
   AnalysisPort,
   AlertSubscriptionResult,
@@ -9,6 +10,8 @@ import type {
   AuditPort,
   BlockerAnalysis,
   CompletionForecast,
+  DemoPort,
+  DemoResetResult,
   EscalationPayload,
   FindingSnapshot,
   PlannedAction,
@@ -25,13 +28,16 @@ import type {
   WorkflowStateSnapshot,
 } from './contracts.js';
 import { Injectable } from '@nitrostack/core';
+import { PolicyService } from '../security/index.js';
+import type { Capability, Principal } from '../security/index.js';
 import { HandoffOSRuntime } from './handoffos.runtime.js';
 
 @Injectable({ deps: [HandoffOSRuntime] })
 export class HandoffOSApplication {
   private readonly plannedActionsByWorkflow = new Map<WorkflowId, Map<string, PlannedAction>>();
+  private readonly policy = new PolicyService();
 
-  constructor(private readonly runtime: WorkflowPort & AnalysisPort & ActionPort & AuditPort & Phase2Port) {}
+  constructor(private readonly runtime: WorkflowPort & AnalysisPort & ActionPort & AuditPort & DemoPort & Phase2Port) {}
 
   getState(workflowId: WorkflowId): Promise<WorkflowStateSnapshot> {
     return this.runtime.getState(workflowId);
@@ -53,12 +59,25 @@ export class HandoffOSApplication {
     return this.runtime.verifyAuditIntegrity(workflowId);
   }
 
+  async resetDemo(principalId: string): Promise<DemoResetResult> {
+    this.authorize(principalId, 'reset_demo');
+    const result = await this.runtime.resetDemo(principalId);
+    this.plannedActionsByWorkflow.clear();
+    return result;
+  }
+
   getRules(): Promise<RuleDefinition[]> {
     return this.runtime.getRules();
   }
 
-  ingestEvent(workflowId: WorkflowId, event: WorkflowEventInput): Promise<WorkflowStateSnapshot> {
+  async ingestEvent(workflowId: WorkflowId, event: WorkflowEventInput, principalId: string): Promise<WorkflowStateSnapshot> {
+    this.authorize(principalId, 'ingest_event');
     return this.runtime.ingestEvent(workflowId, event);
+  }
+
+  authorize(principalId: string, capability: Capability): AuthorizationContext {
+    const principal = this.policy.authorize(principalId, capability);
+    return this.toAuthorizationContext(principal, capability);
   }
 
   detectBlockers(workflowId: WorkflowId): Promise<BlockerAnalysis> {
@@ -85,18 +104,16 @@ export class HandoffOSApplication {
   async executeAction(
     workflowId: WorkflowId,
     actionId: string,
-    approvedBy: string,
+    principalId: string,
   ): Promise<ActionExecutionResult> {
-    if (!approvedBy.trim()) {
-      throw new Error('An approver is required to execute an action.');
-    }
+    this.authorize(principalId, 'execute_action');
 
     const plannedAction = this.plannedActionsByWorkflow.get(workflowId)?.get(actionId);
     if (!plannedAction) {
       throw new Error('Action must be returned by plan_next_actions before execution.');
     }
 
-    const result = await this.runtime.executeAction(workflowId, actionId, approvedBy);
+    const result = await this.runtime.executeAction(workflowId, actionId, principalId);
     this.plannedActionsByWorkflow.get(workflowId)?.delete(actionId);
     return result;
   }
@@ -113,8 +130,9 @@ export class HandoffOSApplication {
     return this.runtime.compareWorkflows(workflowIds);
   }
 
-  rollbackAction(workflowId: WorkflowId, approvedBy: string): Promise<RollbackActionResult> {
-    return this.runtime.rollbackAction(workflowId, approvedBy);
+  async rollbackAction(workflowId: WorkflowId, principalId: string): Promise<RollbackActionResult> {
+    this.authorize(principalId, 'rollback_action');
+    return this.runtime.rollbackAction(workflowId, principalId);
   }
 
   simulateMultiResolution(workflowId: WorkflowId, nodeIds: string[], resolvedAt: string): Promise<MultiSimulationResult> {
@@ -125,12 +143,22 @@ export class HandoffOSApplication {
     return this.runtime.getOwnerWorkload(ownerId, workflowIds);
   }
 
-  subscribeAlerts(input: Omit<AlertSubscriptionResult, 'id' | 'createdAt'>): Promise<AlertSubscriptionResult> {
+  async subscribeAlerts(input: Omit<AlertSubscriptionResult, 'id' | 'createdAt'>, principalId: string): Promise<AlertSubscriptionResult> {
+    this.authorize(principalId, 'subscribe_alerts');
     return this.runtime.subscribeAlerts(input);
   }
 
   exportAuditReport(workflowId: WorkflowId): Promise<AuditReport> {
     return this.runtime.exportAuditReport(workflowId);
+  }
+
+  private toAuthorizationContext(principal: Principal, capability: Capability): AuthorizationContext {
+    return {
+      principalId: principal.id,
+      displayName: principal.displayName,
+      roles: [...principal.roles],
+      capability,
+    };
   }
 }
 

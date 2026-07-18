@@ -188,6 +188,9 @@ describe('Health Calculation', () => {
       criticalPathBlocked: 5,
       approvalStale: 0,
       calendarMissing: 5,
+      duplicateTask: 5,
+      ownerUnresponsive: 8,
+      conflictingStatus: 10,
     });
   });
 
@@ -315,12 +318,12 @@ describe('Finding Stability', () => {
 });
 
 describe('All Rules Registered', () => {
-  it('has exactly 7 rules', () => {
-    assert.equal(ALL_RULES.length, 7);
+  it('has exactly 10 rules', () => {
+    assert.equal(ALL_RULES.length, 10);
   });
 
-  it('covers R-001 through R-007', () => {
+  it('covers R-001 through R-010', () => {
     const ids = ALL_RULES.map(r => r.id).sort();
-    assert.deepEqual(ids, ['R-001', 'R-002', 'R-003', 'R-004', 'R-005', 'R-006', 'R-007']);
+    assert.deepEqual(ids, ['R-001', 'R-002', 'R-003', 'R-004', 'R-005', 'R-006', 'R-007', 'R-008', 'R-009', 'R-010']);
   });
 });

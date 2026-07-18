@@ -39,7 +39,7 @@ test('Phase 2 application returns deterministic operational query results', asyn
     comparator: 'lt',
     threshold: 70,
     subscriberId: 'manager-001',
-  });
+  }, 'it-operator');
   assert.equal(subscription.id, 'SUB-001');
   assert.equal(subscription.subscriberId, 'manager-001');
 
@@ -54,19 +54,19 @@ test('Phase 2 rollback is approval-gated and multi-simulation does not mutate li
   assert.equal(plans.length, 1);
 
   await assert.rejects(
-    () => app.executeAction('onboard-priya', plans[0].id, ''),
-    /approver/i,
+    () => app.executeAction('onboard-priya', plans[0].id, 'demo-viewer'),
+    /not authorized/i,
   );
 
-  await app.executeAction('onboard-priya', plans[0].id, 'IT Director');
+  await app.executeAction('onboard-priya', plans[0].id, 'it-director');
   const executedState = await app.getState('onboard-priya');
   assert.equal(executedState.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'completed');
 
   await assert.rejects(
-    () => app.rollbackAction('onboard-priya', ''),
-    /approver/i,
+    () => app.rollbackAction('onboard-priya', 'demo-viewer'),
+    /not authorized/i,
   );
-  const rollback = await app.rollbackAction('onboard-priya', 'IT Director');
+  const rollback = await app.rollbackAction('onboard-priya', 'it-director');
   assert.equal(rollback.state.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'blocked');
   const integrity = await app.verifyAuditIntegrity('onboard-priya');
   assert.equal(integrity.valid, true);
@@ -83,4 +83,32 @@ test('Phase 2 rollback is approval-gated and multi-simulation does not mutate li
 
   const liveState = await app.getState('onboard-priya');
   assert.equal(liveState.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'blocked');
+});
+
+test('demo reset restores both workflow seeds and starts fresh audit chains', async () => {
+  const app = createHandoffOSApplication();
+  const plans = await app.planNextActions('onboard-priya');
+  await app.executeAction('onboard-priya', plans[0].id, 'it-director');
+  await app.subscribeAlerts({
+    workflowId: 'onboard-priya',
+    metric: 'health',
+    comparator: 'lt',
+    threshold: 70,
+    subscriberId: 'manager-001',
+  }, 'it-operator');
+
+  await assert.rejects(() => app.resetDemo('it-director'), /not authorized/i);
+  const reset = await app.resetDemo('workflow-admin');
+  assert.deepEqual(reset.workflowIds, ['onboard-priya', 'vendor-onboarding']);
+  assert.equal(reset.states.find((state) => state.workflowId === 'onboard-priya')?.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'blocked');
+  assert.equal((await app.getAuditLog('onboard-priya')).length, 1);
+  assert.equal((await app.verifyAuditIntegrity('onboard-priya')).valid, true);
+  const nextSubscription = await app.subscribeAlerts({
+    workflowId: 'onboard-priya',
+    metric: 'health',
+    comparator: 'lt',
+    threshold: 70,
+    subscriberId: 'manager-001',
+  }, 'it-operator');
+  assert.equal(nextSubscription.id, 'SUB-001');
 });
