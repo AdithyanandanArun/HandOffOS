@@ -6,6 +6,7 @@ const testFiles = [
   'tests/phase2.domain.test.mjs',
   'tests/phase2.mcp-handlers.test.mjs',
   'tests/security.test.mjs',
+  'tests/mcp/handoffos.application.test.mjs',
 ];
 
 for (const testFile of testFiles) {

@@ -13,8 +13,6 @@ import {
   executeActionOutputSchema,
   exportAuditReportOutputSchema,
   exportAuditReportSchema,
-  getOwnerWorkloadOutputSchema,
-  getOwnerWorkloadSchema,
   ingestEventSchema,
   ingestEventOutputSchema,
   planNextActionsOutputSchema,
@@ -27,8 +25,6 @@ import {
   simulateResolutionOutputSchema,
   simulateMultiResolutionOutputSchema,
   simulateMultiResolutionSchema,
-  subscribeAlertsOutputSchema,
-  subscribeAlertsSchema,
   resetDemoOutputSchema,
   resetDemoSchema,
   verifyAuditIntegrityOutputSchema,
@@ -38,7 +34,6 @@ import {
   type EscalateBlockerInput,
   type ExecuteActionInput,
   type ExportAuditReportInput,
-  type GetOwnerWorkloadInput,
   type IngestEventInput,
   type PredictCompletionInput,
   type PlanNextActionsInput,
@@ -46,7 +41,6 @@ import {
   type RollbackActionInput,
   type SimulateResolutionInput,
   type SimulateMultiResolutionInput,
-  type SubscribeAlertsInput,
   type VerifyAuditIntegrityInput,
   type WorkflowIdInput,
 } from './handoffos.schemas.js';
@@ -315,52 +309,6 @@ export class HandoffOSTools {
         authorization,
         liveTool: 'what_if_multi',
       }),
-    };
-  }
-
-  @Widget({ route: 'handoff-dashboard', prefersBorder: false })
-  @Tool({
-    name: 'get_owner_workload',
-    description: 'Aggregate open workflow nodes and active findings for an owner across workflows.',
-    inputSchema: getOwnerWorkloadSchema,
-    outputSchema: getOwnerWorkloadOutputSchema,
-  })
-  async getOwnerWorkload(input: GetOwnerWorkloadInput, context: ExecutionContext) {
-    const authorization = this.authorize(input.principalId, 'read_workflow_analysis');
-    context.logger.info('Getting owner workload', { ownerId: input.ownerId, workflowIds: input.workflowIds });
-    const workload = await this.application.getOwnerWorkload(input.ownerId, input.workflowIds);
-    const dashboardWorkflowId = input.workflowIds?.[0] ?? defaultWorkflowId;
-    const [state, analysis, auditLog] = await Promise.all([
-      this.application.getState(dashboardWorkflowId),
-      this.application.detectBlockers(dashboardWorkflowId),
-      this.application.getAuditLog(dashboardWorkflowId),
-    ]);
-    return {
-      summary: `${workload.ownerId} owns ${workload.openNodeIds.length} open node${workload.openNodeIds.length === 1 ? '' : 's'} and ${workload.activeFindingIds.length} active finding${workload.activeFindingIds.length === 1 ? '' : 's'}.`,
-      workload,
-      ...createDashboardData({ state, analysis, auditLog, authorization, liveTool: 'get_owner_workload' }),
-    };
-  }
-
-  @Tool({
-    name: 'subscribe_alerts',
-    description: 'Register an in-memory alert subscription for a workflow metric threshold.',
-    inputSchema: subscribeAlertsSchema,
-    outputSchema: subscribeAlertsOutputSchema,
-  })
-  async subscribeAlerts(input: SubscribeAlertsInput, context: ExecutionContext) {
-    const workflowId = resolveWorkflowId(input);
-    context.logger.info('Registering workflow alert subscription', { workflowId, metric: input.metric, subscriberId: input.subscriberId });
-    const subscription = await this.application.subscribeAlerts({
-      workflowId,
-      metric: input.metric,
-      comparator: input.comparator,
-      threshold: input.threshold,
-      subscriberId: input.subscriberId,
-    }, input.principalId);
-    return {
-      summary: `Alert subscription ${subscription.id} is active for ${subscription.metric} ${subscription.comparator} ${subscription.threshold}.`,
-      subscription,
     };
   }
 

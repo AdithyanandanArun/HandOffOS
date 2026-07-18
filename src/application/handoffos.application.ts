@@ -60,8 +60,8 @@ export class HandoffOSApplication {
   }
 
   async resetDemo(principalId: string): Promise<DemoResetResult> {
-    this.authorize(principalId, 'reset_demo');
-    const result = await this.runtime.resetDemo(principalId);
+    const authContext = this.authorize(principalId, 'reset_demo');
+    const result = await this.runtime.resetDemo(authContext.displayName);
     this.plannedActionsByWorkflow.clear();
     return result;
   }
@@ -106,16 +106,22 @@ export class HandoffOSApplication {
     actionId: string,
     principalId: string,
   ): Promise<ActionExecutionResult> {
-    this.authorize(principalId, 'execute_action');
+    if (!principalId || !principalId.trim()) {
+      throw new Error('An approver is required to execute this action.');
+    }
+    const authContext = this.authorize(principalId, 'execute_action');
 
     const plannedAction = this.plannedActionsByWorkflow.get(workflowId)?.get(actionId);
     if (!plannedAction) {
       throw new Error('Action must be returned by plan_next_actions before execution.');
     }
 
-    const result = await this.runtime.executeAction(workflowId, actionId, principalId);
+    const result = await this.runtime.executeAction(workflowId, actionId, authContext.displayName);
     this.plannedActionsByWorkflow.get(workflowId)?.delete(actionId);
-    return result;
+    return {
+      ...result,
+      principalId,
+    };
   }
 
   escalateBlocker(workflowId: WorkflowId): Promise<EscalationPayload> {
@@ -131,8 +137,12 @@ export class HandoffOSApplication {
   }
 
   async rollbackAction(workflowId: WorkflowId, principalId: string): Promise<RollbackActionResult> {
-    this.authorize(principalId, 'rollback_action');
-    return this.runtime.rollbackAction(workflowId, principalId);
+    const authContext = this.authorize(principalId, 'rollback_action');
+    const result = await this.runtime.rollbackAction(workflowId, authContext.displayName);
+    return {
+      ...result,
+      principalId,
+    };
   }
 
   simulateMultiResolution(workflowId: WorkflowId, nodeIds: string[], resolvedAt: string): Promise<MultiSimulationResult> {

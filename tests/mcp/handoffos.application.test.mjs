@@ -1,17 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
+
+// NitroStack starts a maintenance interval when decorators load. It is irrelevant
+// to these in-memory tests, so do not let it keep the test worker alive.
+const nativeSetInterval = globalThis.setInterval;
+globalThis.setInterval = (...args) => {
+  const timer = nativeSetInterval(...args);
+  timer.unref?.();
+  return timer;
+};
+const {
   extractPrompts,
   extractResources,
   extractTools,
-} from '@nitrostack/core';
-import { createHandoffOSApplication } from '../../dist/application/handoffos.application.js';
-import { HandoffOSPrompts } from '../../dist/modules/handoffos/handoffos.prompts.js';
-import { HandoffOSResources } from '../../dist/modules/handoffos/handoffos.resources.js';
-import {
-  HandoffOSTools,
-} from '../../dist/modules/handoffos/handoffos.tools.js';
-import {
+} = await import('@nitrostack/core');
+const { createHandoffOSApplication } = await import('../../dist/application/handoffos.application.js');
+const { HandoffOSPrompts } = await import('../../dist/modules/handoffos/handoffos.prompts.js');
+const { HandoffOSResources } = await import('../../dist/modules/handoffos/handoffos.resources.js');
+const { HandoffOSTools } = await import('../../dist/modules/handoffos/handoffos.tools.js');
+const {
   executeActionSchema,
   executeActionOutputSchema,
   detectBlockersOutputSchema,
@@ -19,7 +26,7 @@ import {
   planNextActionsOutputSchema,
   simulateResolutionSchema,
   simulateResolutionOutputSchema,
-} from '../../dist/modules/handoffos/handoffos.schemas.js';
+} = await import('../../dist/modules/handoffos/handoffos.schemas.js');
 
 const workflowId = 'onboard-priya';
 
@@ -33,20 +40,44 @@ test('MCP discovery exposes the required HandoffOS resources, tools, and prompts
   assert.deepEqual(
     extractResources(HandoffOSResources).map((resource) => resource.options.uri),
     [
+      'workflow://catalog',
       'workflow://onboard-priya/state',
       'workflow://onboard-priya/events',
       'workflow://onboard-priya/findings',
       'workflow://onboard-priya/audit-log',
+      'workflow://vendor-onboarding/state',
+      'workflow://vendor-onboarding/events',
+      'workflow://vendor-onboarding/findings',
+      'workflow://vendor-onboarding/audit-log',
       'workflow://rules',
     ],
   );
   assert.deepEqual(
     extractTools(HandoffOSTools).map((tool) => tool.options.name),
-    ['ingest_event', 'detect_blockers', 'simulate_resolution', 'plan_next_actions', 'execute_action'],
+    [
+      'ingest_event',
+      'detect_blockers',
+      'simulate_resolution',
+      'plan_next_actions',
+      'execute_action',
+      'escalate_blocker',
+      'predict_completion',
+      'compare_workflows',
+      'rollback_action',
+      'what_if_multi',
+      'export_audit_report',
+      'verify_audit_integrity',
+      'reset_demo',
+    ],
   );
   assert.deepEqual(
     extractPrompts(HandoffOSPrompts).map((prompt) => prompt.options.name),
-    ['explain_blocker', 'manager_summary'],
+    [
+      'explain_blocker',
+      'manager_summary',
+      'escalation_email',
+      'executive_digest',
+    ],
   );
 });
 
@@ -91,7 +122,7 @@ test('execute_action rejects unplanned and unapproved actions', async () => {
   const application = createApplication();
 
   await assert.rejects(
-    application.executeAction(workflowId, 'resolve-laptop-allocation', 'IT Director'),
+    application.executeAction(workflowId, 'resolve-laptop-allocation', 'it-director'),
     /plan_next_actions/,
   );
   await application.planNextActions(workflowId);
@@ -106,7 +137,7 @@ test('approved laptop execution updates state, releases dependencies, and append
   const actions = await application.planNextActions(workflowId);
   assert.deepEqual(actions.map((action) => action.id), ['resolve-laptop-allocation']);
 
-  const result = await application.executeAction(workflowId, actions[0].id, 'IT Director');
+  const result = await application.executeAction(workflowId, actions[0].id, 'it-director');
   const auditLog = await application.getAuditLog(workflowId);
 
   assert.equal(result.state.nodes.find((node) => node.id === 'laptop-allocation')?.status, 'completed');
@@ -122,10 +153,10 @@ test('dashboard-linked tools emit validated structured responses for the widget'
   const application = createApplication();
   const tools = new HandoffOSTools(application);
 
-  const defaultBlockers = await tools.detectBlockers({}, context);
+  const defaultBlockers = await tools.detectBlockers({ principalId: 'demo-viewer' }, context);
   assert.equal(defaultBlockers.analysis.workflowId, workflowId);
 
-  const blockers = await tools.detectBlockers({ workflowId }, context);
+  const blockers = await tools.detectBlockers({ workflowId, principalId: 'demo-viewer' }, context);
   assert.equal(detectBlockersOutputSchema.safeParse(blockers).success, true);
   assert.equal(blockers.workflow.stations.find((station) => station.id === 'laptop-allocation')?.status, 'blocked');
 
@@ -133,17 +164,18 @@ test('dashboard-linked tools emit validated structured responses for the widget'
     workflowId,
     nodeId: 'laptop-allocation',
     resolvedAt: '2025-01-15T10:00:00.000Z',
+    principalId: 'ops-analyst',
   }, context);
   assert.equal(simulateResolutionOutputSchema.safeParse(simulation).success, true);
   assert.equal(simulation.simulation.after.health, 86);
 
-  const plan = await tools.planNextActions({ workflowId }, context);
+  const plan = await tools.planNextActions({ workflowId, principalId: 'ops-analyst' }, context);
   assert.equal(planNextActionsOutputSchema.safeParse(plan).success, true);
 
   const execution = await tools.executeAction({
     workflowId,
     actionId: plan.actions[0].id,
-    approvedBy: 'IT Director',
+    principalId: 'it-director',
   }, context);
   assert.equal(executeActionOutputSchema.safeParse(execution).success, true);
   assert.equal(execution.workflow.stations.find((station) => station.id === 'identity-access')?.status, 'ready');
