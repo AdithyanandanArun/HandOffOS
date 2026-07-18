@@ -48,6 +48,7 @@ export interface FindingSnapshot {
   evidenceIds: string[];
   affectedNodeIds: string[];
   riskPoints: number;
+  confidence: 'strong' | 'weak';
 }
 
 export interface RuleDefinition {

@@ -89,6 +89,7 @@ function toFinding(finding: Finding): FindingSnapshot {
     evidenceIds: [...finding.evidenceIds],
     affectedNodeIds: [...finding.affectedNodeIds],
     riskPoints: finding.riskPoints,
+    confidence: finding.confidence,
   };
 }
 

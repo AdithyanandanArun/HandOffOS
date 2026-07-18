@@ -1,11 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createSeedState } from '../../src/workflow/seed.ts';
-import { evaluateAllRules, computeCriticalPath, findRootBlocker, getDownstreamNodes, ALL_RULES } from '../../src/rules/engine.ts';
-import { analyzeWorkflow, calculateHealth } from '../../src/analysis/analyze.ts';
-import { simulateResolution } from '../../src/analysis/simulate.ts';
+import { evaluateAllRules, computeCriticalPath, findRootBlocker, getDownstreamNodes, ALL_RULES, RISK_POINTS } from '../../src/rules/engine.ts';
+import { analyzeWorkflow, calculateHealth, predictCompletion } from '../../src/analysis/analyze.ts';
+import { simulateResolution, simulateMultiResolution } from '../../src/analysis/simulate.ts';
 import { demoNow } from '../../src/domain/demo-clock.ts';
-import type { WorkflowState, Finding } from '../../src/domain/types.ts';
+import type { WorkflowState, Finding, SourceEvent, Evidence } from '../../src/domain/types.ts';
 
 function seedState(): WorkflowState {
   return createSeedState();
@@ -298,12 +298,324 @@ describe('Finding Stability', () => {
 });
 
 describe('All Rules Registered', () => {
-  it('has exactly 7 rules', () => {
-    assert.equal(ALL_RULES.length, 7);
+  it('has exactly 10 rules', () => {
+    assert.equal(ALL_RULES.length, 10);
   });
 
-  it('covers R-001 through R-007', () => {
+  it('covers R-001 through R-010', () => {
     const ids = ALL_RULES.map(r => r.id).sort();
-    assert.deepEqual(ids, ['R-001', 'R-002', 'R-003', 'R-004', 'R-005', 'R-006', 'R-007']);
+    assert.deepEqual(ids, ['R-001', 'R-002', 'R-003', 'R-004', 'R-005', 'R-006', 'R-007', 'R-008', 'R-009', 'R-010']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2 Tests
+// ---------------------------------------------------------------------------
+
+function addDuplicateTaskEvents(state: WorkflowState): void {
+  const evtA: SourceEvent = {
+    id: 'EVT-DUP-A',
+    source: 'hr-system',
+    timestamp: new Date('2025-01-09T10:00:00Z'),
+    actor: 'HR System',
+    type: 'task_created',
+    payload: { taskNodeId: 'laptop-allocation', description: 'Create laptop task' },
+    evidenceId: 'EVD-DUP-A',
+  };
+  const evtB: SourceEvent = {
+    id: 'EVT-DUP-B',
+    source: 'task-board',
+    timestamp: new Date('2025-01-09T10:05:00Z'),
+    actor: 'Manager Bot',
+    type: 'task_created',
+    payload: { taskNodeId: 'laptop-allocation', description: 'Auto-create laptop task' },
+    evidenceId: 'EVD-DUP-B',
+  };
+  state.events.push(evtA, evtB);
+  state.evidence.push(
+    { id: 'EVD-DUP-A', sourceEventId: 'EVT-DUP-A', type: 'event', description: 'HR system created laptop task', timestamp: evtA.timestamp },
+    { id: 'EVD-DUP-B', sourceEventId: 'EVT-DUP-B', type: 'event', description: 'Task board auto-created laptop task', timestamp: evtB.timestamp },
+  );
+}
+
+function addConflictingStatusEvents(state: WorkflowState): void {
+  const evtA: SourceEvent = {
+    id: 'EVT-CONFLICT-A',
+    source: 'hr-system',
+    timestamp: new Date('2025-01-09T11:00:00Z'),
+    actor: 'HR System',
+    type: 'status_update',
+    payload: { taskNodeId: 'laptop-allocation', status: 'in_progress' },
+    evidenceId: 'EVD-CONFLICT-A',
+  };
+  const evtB: SourceEvent = {
+    id: 'EVT-CONFLICT-B',
+    source: 'task-board',
+    timestamp: new Date('2025-01-09T11:05:00Z'),
+    actor: 'IT Dashboard',
+    type: 'status_update',
+    payload: { taskNodeId: 'laptop-allocation', status: 'blocked' },
+    evidenceId: 'EVD-CONFLICT-B',
+  };
+  state.events.push(evtA, evtB);
+  state.evidence.push(
+    { id: 'EVD-CONFLICT-A', sourceEventId: 'EVT-CONFLICT-A', type: 'event', description: 'HR reports laptop in progress', timestamp: evtA.timestamp },
+    { id: 'EVD-CONFLICT-B', sourceEventId: 'EVT-CONFLICT-B', type: 'event', description: 'IT dashboard reports laptop blocked', timestamp: evtB.timestamp },
+  );
+}
+
+describe('R-008: Duplicate Task Detected', () => {
+  it('does not fire on clean seed state', () => {
+    const state = seedState();
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-008');
+    assert.equal(findings.length, 0);
+  });
+
+  it('fires when duplicate task_created events exist', () => {
+    const state = seedState();
+    addDuplicateTaskEvents(state);
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-008');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].affectedNodeIds[0], 'laptop-allocation');
+    assert.equal(findings[0].riskPoints, RISK_POINTS.duplicateTask);
+  });
+
+  it('includes evidence from both duplicate events', () => {
+    const state = seedState();
+    addDuplicateTaskEvents(state);
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-008');
+    assert.ok(findings[0].evidenceIds.includes('EVD-DUP-A'));
+    assert.ok(findings[0].evidenceIds.includes('EVD-DUP-B'));
+  });
+
+  it('has strong confidence with 2+ evidence entries', () => {
+    const state = seedState();
+    addDuplicateTaskEvents(state);
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-008');
+    assert.equal(findings[0].confidence, 'strong');
+  });
+});
+
+describe('R-009: Owner Unresponsive', () => {
+  it('does not fire on seed state (blocked nodes skipped)', () => {
+    const state = seedState();
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-009');
+    assert.equal(findings.length, 0);
+  });
+
+  it('fires for ready nodes with SLA and no owner activity', () => {
+    const state = seedState();
+    const node = state.nodes.find(n => n.id === 'laptop-allocation')!;
+    node.status = 'ready';
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-009');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].affectedNodeIds[0], 'laptop-allocation');
+    assert.equal(findings[0].riskPoints, RISK_POINTS.ownerUnresponsive);
+  });
+
+  it('does not fire when owner has recent activity', () => {
+    const state = seedState();
+    const node = state.nodes.find(n => n.id === 'laptop-allocation')!;
+    node.status = 'ready';
+    state.events.push({
+      id: 'EVT-OWNER-ACT',
+      source: 'task-board',
+      timestamp: new Date('2025-01-14T09:00:00Z'),
+      actor: 'IT Ops',
+      type: 'status_update',
+      payload: { note: 'Working on it' },
+      evidenceId: 'EVD-OWNER-ACT',
+    });
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-009');
+    assert.equal(findings.length, 0);
+  });
+
+  it('does not fire for nodes without SLA', () => {
+    const state = seedState();
+    const node = state.nodes.find(n => n.id === 'identity-access')!;
+    node.status = 'ready';
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-009');
+    assert.equal(findings.length, 0);
+  });
+});
+
+describe('R-010: Conflicting Status', () => {
+  it('does not fire on clean seed state', () => {
+    const state = seedState();
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-010');
+    assert.equal(findings.length, 0);
+  });
+
+  it('fires when conflicting status events exist', () => {
+    const state = seedState();
+    addConflictingStatusEvents(state);
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-010');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].affectedNodeIds[0], 'laptop-allocation');
+    assert.equal(findings[0].riskPoints, RISK_POINTS.conflictingStatus);
+  });
+
+  it('includes evidence from both conflicting events', () => {
+    const state = seedState();
+    addConflictingStatusEvents(state);
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-010');
+    assert.ok(findings[0].evidenceIds.includes('EVD-CONFLICT-A'));
+    assert.ok(findings[0].evidenceIds.includes('EVD-CONFLICT-B'));
+  });
+
+  it('has strong confidence with corroborating evidence', () => {
+    const state = seedState();
+    addConflictingStatusEvents(state);
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-010');
+    assert.equal(findings[0].confidence, 'strong');
+  });
+
+  it('does not fire when statuses agree', () => {
+    const state = seedState();
+    state.events.push(
+      {
+        id: 'EVT-AGREE-A', source: 'hr-system', timestamp: new Date('2025-01-09T11:00:00Z'),
+        actor: 'HR', type: 'status_update',
+        payload: { taskNodeId: 'laptop-allocation', status: 'blocked' }, evidenceId: 'EVD-AGREE-A',
+      },
+      {
+        id: 'EVT-AGREE-B', source: 'task-board', timestamp: new Date('2025-01-09T11:05:00Z'),
+        actor: 'IT', type: 'status_update',
+        payload: { taskNodeId: 'laptop-allocation', status: 'blocked' }, evidenceId: 'EVD-AGREE-B',
+      },
+    );
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-010');
+    assert.equal(findings.length, 0);
+  });
+});
+
+describe('Finding Confidence Classification', () => {
+  it('classifies findings with 2+ event evidence as strong', () => {
+    const state = seedState();
+    addDuplicateTaskEvents(state);
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-008');
+    assert.equal(findings[0].confidence, 'strong');
+  });
+
+  it('classifies findings with single evidence as weak', () => {
+    const state = seedState();
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-007');
+    assert.equal(findings[0].confidence, 'weak');
+  });
+
+  it('classifies absence-based findings as weak', () => {
+    const state = seedState();
+    state.evidence.push({
+      id: 'EVD-DOC', sourceEventId: null, type: 'absence',
+      description: 'Missing onboarding document checklist', timestamp: demoNow(),
+    });
+    state.nodes.find(n => n.id === 'laptop-allocation')!.evidenceIds.push('EVD-DOC');
+    const findings = evaluateAllRules(state).filter(f => f.ruleId === 'R-004');
+    assert.equal(findings[0].confidence, 'weak');
+  });
+
+  it('every finding in seed state has a confidence field', () => {
+    const state = seedState();
+    const result = analyzeWorkflow(state);
+    for (const f of result.findings) {
+      assert.ok(f.confidence === 'strong' || f.confidence === 'weak', `Finding ${f.id} missing confidence`);
+    }
+  });
+});
+
+describe('predictCompletion', () => {
+  it('returns a forecast with estimated completion date', () => {
+    const state = seedState();
+    const forecast = predictCompletion(state);
+    assert.ok(forecast.estimatedCompletion instanceof Date);
+    assert.ok(forecast.totalDaysRemaining > 0);
+  });
+
+  it('lists delay-driving nodes on the critical path', () => {
+    const state = seedState();
+    const forecast = predictCompletion(state);
+    assert.ok(forecast.delayDrivers.length > 0);
+    assert.ok(forecast.delayDrivers.some(d => d.nodeId === 'laptop-allocation'));
+  });
+
+  it('includes blocked nodes with SLA overdue contributing extra days', () => {
+    const state = seedState();
+    const forecast = predictCompletion(state);
+    const laptopDriver = forecast.delayDrivers.find(d => d.nodeId === 'laptop-allocation');
+    assert.ok(laptopDriver!.daysContributed > 1);
+    assert.ok(laptopDriver!.reason.includes('past SLA'));
+  });
+
+  it('returns the critical path', () => {
+    const state = seedState();
+    const forecast = predictCompletion(state);
+    assert.ok(forecast.criticalPath.length > 0);
+    assert.ok(forecast.criticalPath.includes('laptop-allocation'));
+  });
+
+  it('is deterministic', () => {
+    const forecast1 = predictCompletion(seedState());
+    const forecast2 = predictCompletion(seedState());
+    assert.equal(forecast1.totalDaysRemaining, forecast2.totalDaysRemaining);
+    assert.equal(forecast1.estimatedCompletion.getTime(), forecast2.estimatedCompletion.getTime());
+  });
+});
+
+describe('simulateMultiResolution', () => {
+  it('resolves multiple nodes in a single pass', () => {
+    const state = seedState();
+    const result = simulateMultiResolution(
+      state,
+      ['laptop-allocation', 'identity-access'],
+      demoNow()
+    );
+    assert.ok(result.afterHealth > result.beforeHealth);
+    assert.deepEqual(result.resolvedNodeIds, ['laptop-allocation', 'identity-access']);
+  });
+
+  it('leaves live state unchanged', () => {
+    const state = seedState();
+    const originalNodes = JSON.stringify(state.nodes);
+    simulateMultiResolution(state, ['laptop-allocation'], demoNow());
+    assert.equal(JSON.stringify(state.nodes), originalNodes);
+  });
+
+  it('returns combined before/after health', () => {
+    const state = seedState();
+    const result = simulateMultiResolution(state, ['laptop-allocation'], demoNow());
+    assert.equal(result.beforeHealth, 62);
+    assert.equal(result.afterHealth, 86);
+  });
+
+  it('returns findings delta', () => {
+    const state = seedState();
+    const result = simulateMultiResolution(state, ['laptop-allocation'], demoNow());
+    assert.ok(result.findingsDelta.resolved.length > 0);
+  });
+
+  it('returns critical path and completion estimate', () => {
+    const state = seedState();
+    const result = simulateMultiResolution(state, ['laptop-allocation'], demoNow());
+    assert.ok(result.criticalPath.length > 0);
+    assert.ok(result.completionEstimate instanceof Date);
+  });
+
+  it('throws for unknown node', () => {
+    const state = seedState();
+    assert.throws(
+      () => simulateMultiResolution(state, ['nonexistent'], demoNow()),
+      /not found/
+    );
+  });
+
+  it('resolving more nodes yields better health than fewer', () => {
+    const state = seedState();
+    const single = simulateMultiResolution(state, ['laptop-allocation'], demoNow());
+    const multi = simulateMultiResolution(
+      state,
+      ['laptop-allocation', 'identity-access', 'vpn-setup'],
+      demoNow()
+    );
+    assert.ok(multi.afterHealth >= single.afterHealth);
   });
 });

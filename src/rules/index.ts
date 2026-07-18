@@ -1,5 +1,6 @@
 export {
   ALL_RULES,
+  RISK_POINTS,
   evaluateAllRules,
   computeCriticalPath,
   findRootBlocker,
