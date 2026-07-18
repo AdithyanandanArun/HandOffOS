@@ -19,10 +19,23 @@ export const RISK_POINTS = {
   criticalPathBlocked: 5,
   approvalStale: 0,
   calendarMissing: 5,
+  duplicateTask: 5,
+  ownerUnresponsive: 8,
+  conflictingStatus: 10,
 } as const;
 
 function findingId(ruleId: string, nodeId: string): string {
   return `${ruleId}::${nodeId}`;
+}
+
+function classifyConfidence(state: WorkflowState, evidenceIds: string[]): 'strong' | 'weak' {
+  if (evidenceIds.length < 2) return 'weak';
+  const hasAbsence = evidenceIds.some(eid => {
+    const ev = state.evidence.find(e => e.id === eid);
+    return ev && ev.type === 'absence';
+  });
+  if (hasAbsence && evidenceIds.length < 3) return 'weak';
+  return 'strong';
 }
 
 function nodeById(state: WorkflowState, id: string): WorkflowNode | undefined {
@@ -39,15 +52,17 @@ const R001: RuleDefinition = {
     for (const node of state.nodes) {
       if (node.status === 'completed') continue;
       if (!node.owner || node.owner.trim() === '') {
+        const eIds = [...node.evidenceIds];
         findings.push({
           id: findingId('R-001', node.id),
           ruleId: 'R-001',
           title: `Missing Owner: ${node.label}`,
           severity: 'high',
           explanation: `Node "${node.label}" has no assigned owner. Work cannot proceed without accountability.`,
-          evidenceIds: [...node.evidenceIds],
+          evidenceIds: eIds,
           affectedNodeIds: [node.id],
           riskPoints: RISK_POINTS.missingOwner,
+          confidence: classifyConfidence(state, eIds),
         });
       }
     }
@@ -87,6 +102,7 @@ const R002: RuleDefinition = {
           evidenceIds,
           affectedNodeIds: [node.id, ...getDownstreamNodes(state, node.id)],
           riskPoints: RISK_POINTS.missingDependency,
+          confidence: classifyConfidence(state, evidenceIds),
         });
       }
     }
@@ -107,15 +123,17 @@ const R003: RuleDefinition = {
       if (node.sla && node.sla.getTime() < now.getTime()) {
         const hrsOverdue = Math.floor((now.getTime() - node.sla.getTime()) / (1000 * 60 * 60));
 
+        const slaEIds = [...node.evidenceIds];
         findings.push({
           id: findingId('R-003', node.id),
           ruleId: 'R-003',
           title: `SLA Overdue: ${node.label}`,
           severity: hrsOverdue > 48 ? 'critical' : 'high',
           explanation: `Node "${node.label}" SLA expired ${hrsOverdue} hours ago (deadline: ${node.sla.toISOString()}).`,
-          evidenceIds: [...node.evidenceIds],
+          evidenceIds: slaEIds,
           affectedNodeIds: [node.id],
           riskPoints: RISK_POINTS.slaOverdue,
+          confidence: classifyConfidence(state, slaEIds),
         });
       }
     }
@@ -151,6 +169,7 @@ const R004: RuleDefinition = {
           evidenceIds: [docAbsence.id],
           affectedNodeIds: [node.id],
           riskPoints: RISK_POINTS.missingDocument,
+          confidence: classifyConfidence(state, [docAbsence.id]),
         });
       }
     }
@@ -170,15 +189,17 @@ const R005: RuleDefinition = {
     for (const nodeId of criticalPath) {
       const node = nodeById(state, nodeId);
       if (node && node.status === 'blocked') {
+        const cpEIds = [...node.evidenceIds];
         findings.push({
           id: findingId('R-005', node.id),
           ruleId: 'R-005',
           title: `Critical Path Blocked: ${node.label}`,
           severity: 'critical',
           explanation: `Node "${node.label}" is on the critical path and is blocked. All downstream work is stalled.`,
-          evidenceIds: [...node.evidenceIds],
+          evidenceIds: cpEIds,
           affectedNodeIds: [node.id, ...getDownstreamNodes(state, node.id)],
           riskPoints: RISK_POINTS.criticalPathBlocked,
+          confidence: classifyConfidence(state, cpEIds),
         });
         break;
       }
@@ -206,15 +227,17 @@ const R006: RuleDefinition = {
         );
         if (hasBlockedDownstream) {
           const evidence = state.evidence.find(e => e.sourceEventId === evt.id);
+          const staleEIds = evidence ? [evidence.id] : [];
           findings.push({
             id: findingId('R-006', evt.id),
             ruleId: 'R-006',
             title: `Approval Stale: ${evt.actor}`,
             severity: 'medium',
             explanation: `Approval from "${evt.actor}" on ${evt.timestamp.toISOString().split('T')[0]} has not resulted in downstream progress after ${Math.floor(age / (24 * 60 * 60 * 1000))} days.`,
-            evidenceIds: evidence ? [evidence.id] : [],
+            evidenceIds: staleEIds,
             affectedNodeIds: state.nodes.filter(n => n.status === 'blocked').map(n => n.id),
-          riskPoints: RISK_POINTS.approvalStale,
+            riskPoints: RISK_POINTS.approvalStale,
+            confidence: classifyConfidence(state, staleEIds),
           });
         }
       }
@@ -244,15 +267,17 @@ const R007: RuleDefinition = {
         const absence = state.evidence.find(
           e => e.type === 'absence' && e.description.toLowerCase().includes('calendar')
         );
+        const calEIds = absence ? [absence.id] : [];
         findings.push({
           id: findingId('R-007', node.id),
           ruleId: 'R-007',
           title: `Calendar Missing: ${node.label}`,
           severity: 'medium',
           explanation: `Node "${node.label}" requires a calendar event but none has been scheduled.`,
-          evidenceIds: absence ? [absence.id] : [],
+          evidenceIds: calEIds,
           affectedNodeIds: [node.id],
           riskPoints: RISK_POINTS.calendarMissing,
+          confidence: classifyConfidence(state, calEIds),
         });
       }
     }
@@ -260,7 +285,128 @@ const R007: RuleDefinition = {
   },
 };
 
-export const ALL_RULES: RuleDefinition[] = [R001, R002, R003, R004, R005, R006, R007];
+// R-008: Duplicate Task Detected — fires when two independent source events
+// attempt to create/register the same logical task node.
+const R008: RuleDefinition = {
+  id: 'R-008',
+  title: 'Duplicate Task Detected',
+  description: 'Two independent source events attempt to create the same logical task node.',
+  evaluate(state) {
+    const findings: Finding[] = [];
+    const creationEvents = state.events.filter(
+      e => e.type === 'task_created' || e.type === 'task_registered'
+    );
+
+    const byTarget = new Map<string, typeof creationEvents>();
+    for (const evt of creationEvents) {
+      const target = (evt.payload.taskNodeId ?? evt.payload.nodeId ?? '') as string;
+      if (!target) continue;
+      const group = byTarget.get(target) ?? [];
+      group.push(evt);
+      byTarget.set(target, group);
+    }
+
+    for (const [target, events] of byTarget) {
+      if (events.length < 2) continue;
+      const eIds = events.map(e => e.evidenceId);
+      findings.push({
+        id: findingId('R-008', target),
+        ruleId: 'R-008',
+        title: `Duplicate Task: ${target}`,
+        severity: 'high',
+        explanation: `${events.length} independent events attempted to create task "${target}". Sources: ${events.map(e => e.source).join(', ')}.`,
+        evidenceIds: eIds,
+        affectedNodeIds: [target],
+        riskPoints: RISK_POINTS.duplicateTask,
+        confidence: classifyConfidence(state, eIds),
+      });
+    }
+    return findings;
+  },
+};
+
+// R-009: Owner Unresponsive — fires when no activity or update event from an
+// assigned owner occurs within a configured SLA window.
+const R009: RuleDefinition = {
+  id: 'R-009',
+  title: 'Owner Unresponsive',
+  description: 'No activity from assigned owner within the SLA window.',
+  evaluate(state) {
+    const findings: Finding[] = [];
+    const now = demoNow();
+    const UNRESPONSIVE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
+
+    for (const node of state.nodes) {
+      if (node.status === 'completed' || !node.owner) continue;
+      if (node.status === 'blocked' || node.status === 'pending') continue;
+
+      const ownerEvents = state.events.filter(
+        e => e.actor === node.owner && now.getTime() - e.timestamp.getTime() < UNRESPONSIVE_THRESHOLD_MS
+      );
+
+      if (ownerEvents.length === 0 && node.sla) {
+        const eIds = [...node.evidenceIds];
+        findings.push({
+          id: findingId('R-009', node.id),
+          ruleId: 'R-009',
+          title: `Owner Unresponsive: ${node.owner} on ${node.label}`,
+          severity: 'high',
+          explanation: `No activity from owner "${node.owner}" for node "${node.label}" within the last ${UNRESPONSIVE_THRESHOLD_MS / (24 * 60 * 60 * 1000)} days. SLA deadline: ${node.sla.toISOString()}.`,
+          evidenceIds: eIds,
+          affectedNodeIds: [node.id],
+          riskPoints: RISK_POINTS.ownerUnresponsive,
+          confidence: classifyConfidence(state, eIds),
+        });
+      }
+    }
+    return findings;
+  },
+};
+
+// R-010: Conflicting Status — fires when two source systems report different
+// statuses for the same task node.
+const R010: RuleDefinition = {
+  id: 'R-010',
+  title: 'Conflicting Status',
+  description: 'Two source systems report different statuses for the same task node.',
+  evaluate(state) {
+    const findings: Finding[] = [];
+    const statusEvents = state.events.filter(
+      e => e.type === 'status_update' || e.type === 'status_report'
+    );
+
+    const byTarget = new Map<string, typeof statusEvents>();
+    for (const evt of statusEvents) {
+      const target = (evt.payload.taskNodeId ?? evt.payload.nodeId ?? '') as string;
+      if (!target) continue;
+      const group = byTarget.get(target) ?? [];
+      group.push(evt);
+      byTarget.set(target, group);
+    }
+
+    for (const [target, events] of byTarget) {
+      if (events.length < 2) continue;
+      const statuses = new Set(events.map(e => e.payload.status as string));
+      if (statuses.size < 2) continue;
+
+      const eIds = events.map(e => e.evidenceId);
+      findings.push({
+        id: findingId('R-010', target),
+        ruleId: 'R-010',
+        title: `Conflicting Status: ${target}`,
+        severity: 'critical',
+        explanation: `Task "${target}" has conflicting statuses reported by different systems: ${[...statuses].join(' vs ')}. Sources: ${events.map(e => e.source).join(', ')}.`,
+        evidenceIds: eIds,
+        affectedNodeIds: [target],
+        riskPoints: RISK_POINTS.conflictingStatus,
+        confidence: classifyConfidence(state, eIds),
+      });
+    }
+    return findings;
+  },
+};
+
+export const ALL_RULES: RuleDefinition[] = [R001, R002, R003, R004, R005, R006, R007, R008, R009, R010];
 
 export function evaluateAllRules(state: WorkflowState): Finding[] {
   const findings: Finding[] = [];

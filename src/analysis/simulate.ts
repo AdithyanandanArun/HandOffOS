@@ -1,4 +1,4 @@
-import type { WorkflowState, SimulationResult } from '../domain/types.js';
+import type { WorkflowState, SimulationResult, MultiSimulationResult } from '../domain/types.js';
 import { analyzeWorkflow } from './analyze.js';
 
 function deepClone<T>(obj: T): T {
@@ -82,6 +82,54 @@ export function simulateResolution(
   );
 
   return {
+    beforeHealth: beforeAnalysis.health,
+    afterHealth: afterAnalysis.health,
+    completionEstimate: afterAnalysis.estimatedCompletion ?? resolvedAt,
+    criticalPath: afterAnalysis.criticalPath,
+    findingsDelta: {
+      resolved: resolvedFindings,
+      introduced: introducedFindings,
+    },
+    beforeFindings: beforeAnalysis.findings,
+    afterFindings: afterAnalysis.findings,
+  };
+}
+
+export function simulateMultiResolution(
+  state: WorkflowState,
+  nodeIds: string[],
+  resolvedAt: Date
+): MultiSimulationResult {
+  const beforeAnalysis = analyzeWorkflow(state);
+
+  const cloned = deepClone(state);
+  rehydrateDates(cloned);
+
+  for (const nodeId of nodeIds) {
+    const targetNode = cloned.nodes.find(n => n.id === nodeId);
+    if (!targetNode) {
+      throw new Error(`Node "${nodeId}" not found in workflow`);
+    }
+    targetNode.status = 'completed';
+    targetNode.completedAt = resolvedAt;
+    if (!targetNode.owner || targetNode.owner.trim() === '') {
+      targetNode.owner = 'System (simulated)';
+    }
+  }
+
+  propagateStatuses(cloned);
+
+  const afterAnalysis = analyzeWorkflow(cloned);
+
+  const resolvedFindings = beforeAnalysis.findings.filter(
+    bf => !afterAnalysis.findings.some(af => af.id === bf.id)
+  );
+  const introducedFindings = afterAnalysis.findings.filter(
+    af => !beforeAnalysis.findings.some(bf => bf.id === af.id)
+  );
+
+  return {
+    resolvedNodeIds: nodeIds,
     beforeHealth: beforeAnalysis.health,
     afterHealth: afterAnalysis.health,
     completionEstimate: afterAnalysis.estimatedCompletion ?? resolvedAt,

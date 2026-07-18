@@ -38,6 +38,7 @@ export interface Finding {
   evidenceIds: string[];
   affectedNodeIds: string[];
   riskPoints: number;
+  confidence: 'strong' | 'weak';
 }
 
 export interface AuditEntry {
@@ -67,6 +68,17 @@ export interface SimulationResult {
   };
   beforeFindings: Finding[];
   afterFindings: Finding[];
+}
+
+export interface CompletionForecast {
+  estimatedCompletion: Date;
+  totalDaysRemaining: number;
+  delayDrivers: { nodeId: string; label: string; reason: string; daysContributed: number }[];
+  criticalPath: string[];
+}
+
+export interface MultiSimulationResult extends SimulationResult {
+  resolvedNodeIds: string[];
 }
 
 export interface WorkflowState {

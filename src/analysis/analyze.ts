@@ -1,4 +1,4 @@
-import type { WorkflowState, Finding } from '../domain/types.js';
+import type { WorkflowState, Finding, CompletionForecast } from '../domain/types.js';
 import { demoNow, ESTIMATED_TASK_DURATION_DAYS } from '../domain/demo-clock.js';
 import { evaluateAllRules, computeCriticalPath, findRootBlocker } from '../rules/engine.js';
 
@@ -36,6 +36,56 @@ export function estimateCompletion(state: WorkflowState): Date | null {
   const daysRemaining = incompleteOnPath.length * ESTIMATED_TASK_DURATION_DAYS;
   const estimate = new Date(now.getTime() + daysRemaining * 24 * 60 * 60 * 1000);
   return estimate;
+}
+
+export function predictCompletion(state: WorkflowState): CompletionForecast {
+  const now = demoNow();
+  const criticalPath = computeCriticalPath(state);
+  const delayDrivers: CompletionForecast['delayDrivers'] = [];
+
+  let totalDaysRemaining = 0;
+
+  for (const nodeId of criticalPath) {
+    const node = state.nodes.find(n => n.id === nodeId);
+    if (!node || node.status === 'completed') continue;
+
+    let reason: string;
+    let daysContributed = ESTIMATED_TASK_DURATION_DAYS;
+
+    if (node.status === 'blocked') {
+      const hasSla = node.sla && node.sla.getTime() < now.getTime();
+      if (hasSla) {
+        const overdueDays = Math.ceil((now.getTime() - node.sla!.getTime()) / (24 * 60 * 60 * 1000));
+        daysContributed += overdueDays;
+        reason = `Blocked and ${overdueDays} days past SLA`;
+      } else {
+        reason = 'Blocked by incomplete dependency';
+      }
+    } else if (node.sla && node.sla.getTime() < now.getTime()) {
+      const overdueDays = Math.ceil((now.getTime() - node.sla!.getTime()) / (24 * 60 * 60 * 1000));
+      daysContributed += overdueDays;
+      reason = `SLA overdue by ${overdueDays} days`;
+    } else {
+      reason = 'Awaiting completion';
+    }
+
+    totalDaysRemaining += daysContributed;
+    delayDrivers.push({
+      nodeId: node.id,
+      label: node.label,
+      reason,
+      daysContributed,
+    });
+  }
+
+  const estimatedCompletion = new Date(now.getTime() + totalDaysRemaining * 24 * 60 * 60 * 1000);
+
+  return {
+    estimatedCompletion,
+    totalDaysRemaining,
+    delayDrivers,
+    criticalPath,
+  };
 }
 
 export function analyzeWorkflow(state: WorkflowState): AnalysisResult {

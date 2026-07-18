@@ -58,6 +58,7 @@ export const findingOutputSchema = z.object({
   evidenceIds: z.array(z.string()),
   affectedNodeIds: z.array(z.string()),
   riskPoints: z.number(),
+  confidence: z.enum(['strong', 'weak']),
 });
 
 const dashboardDataOutputSchema = z.object({
