@@ -58,7 +58,9 @@ const server = createServer((request, response) => {
   createReadStream(filePath).pipe(response);
 });
 
-server.listen(port, '0.0.0.0', () => {
+// Studio resolves localhost to ::1 on this Linux host. Omitting the host lets
+// Node bind its dual-stack listener so both IPv4 and IPv6 widget requests work.
+server.listen(port, () => {
   console.log(`HandoffOS widget server listening on http://localhost:${port}`);
 });
 
